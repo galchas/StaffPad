@@ -1,0 +1,173 @@
+<?xml version="1.0" encoding="utf-8"?>
+<MotionScene xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <!-- Base state (all sidebars closed) -->
+    <ConstraintSet android:id="@+id/base_state">
+        <Constraint
+            android:id="@+id/app_toolbar"
+            android:layout_width="0dp"
+            android:layout_height="56dp"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <Constraint
+            android:id="@+id/content_container"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/app_toolbar" />
+
+        <Constraint
+            android:id="@+id/library_sidebar"
+            android:layout_width="320dp"
+            android:layout_height="0dp"
+            android:translationX="-320dp"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <Constraint
+            android:id="@+id/bookmarks_sidebar"
+            android:layout_width="320dp"
+            android:layout_height="0dp"
+            android:translationX="-320dp"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <Constraint
+            android:id="@+id/setlist_sidebar"
+            android:layout_width="320dp"
+            android:layout_height="0dp"
+            android:translationX="-320dp"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <Constraint
+            android:id="@+id/tools_sidebar"
+            android:layout_width="280dp"
+            android:layout_height="0dp"
+            android:translationX="280dp"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <Constraint
+            android:id="@+id/scrim_overlay"
+            android:visibility="gone"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+    </ConstraintSet>
+
+    <!-- Library sidebar shown state -->
+    <ConstraintSet android:id="@+id/library_shown">
+        <Constraint
+            android:id="@+id/library_sidebar"
+            android:layout_width="320dp"
+            android:layout_height="0dp"
+            android:translationX="0dp"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <Constraint
+            android:id="@+id/scrim_overlay"
+            android:visibility="visible"
+            android:alpha="0.5"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="@id/library_sidebar"
+            app:layout_constraintTop_toTopOf="parent" />
+    </ConstraintSet>
+
+    <!-- Bookmarks sidebar shown state -->
+    <ConstraintSet android:id="@+id/bookmarks_shown">
+        <Constraint
+            android:id="@+id/bookmarks_sidebar"
+            android:layout_width="320dp"
+            android:layout_height="0dp"
+            android:translationX="0dp"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <Constraint
+            android:id="@+id/scrim_overlay"
+            android:visibility="visible"
+            android:alpha="0.5"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="@id/bookmarks_sidebar"
+            app:layout_constraintTop_toTopOf="parent" />
+    </ConstraintSet>
+
+    <!-- Setlist sidebar shown state -->
+    <ConstraintSet android:id="@+id/setlist_shown">
+        <Constraint
+            android:id="@+id/setlist_sidebar"
+            android:layout_width="320dp"
+            android:layout_height="0dp"
+            android:translationX="0dp"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <Constraint
+            android:id="@+id/scrim_overlay"
+            android:visibility="visible"
+            android:alpha="0.5"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="@id/setlist_sidebar"
+            app:layout_constraintTop_toTopOf="parent" />
+    </ConstraintSet>
+
+    <!-- Tools sidebar shown state -->
+    <ConstraintSet android:id="@+id/tools_shown">
+        <Constraint
+            android:id="@+id/tools_sidebar"
+            android:layout_width="280dp"
+            android:layout_height="0dp"
+            android:translationX="0dp"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <Constraint
+            android:id="@+id/scrim_overlay"
+            android:visibility="visible"
+            android:alpha="0.5"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+    </ConstraintSet>
+
+    <!-- Transitions -->
+    <Transition
+        app:constraintSetEnd="@id/library_shown"
+        app:constraintSetStart="@id/base_state"
+        app:duration="300" />
+
+    <Transition
+        app:constraintSetEnd="@id/bookmarks_shown"
+        app:constraintSetStart="@id/base_state"
+        app:duration="300" />
+
+    <Transition
+        app:constraintSetEnd="@id/setlist_shown"
+        app:constraintSetStart="@id/base_state"
+        app:duration="300" />
+
+    <Transition
+        app:constraintSetEnd="@id/tools_shown"
+        app:constraintSetStart="@id/base_state"
+        app:duration="300" />
+</MotionScene>
