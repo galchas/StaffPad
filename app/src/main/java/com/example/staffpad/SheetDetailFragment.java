@@ -19,16 +19,22 @@ import com.example.staffpad.viewmodel.SheetViewModel;
 import com.github.chrisbanes.photoview.PhotoView;
 import com.tom_roush.pdfbox.pdmodel.PDDocument;
 import com.tom_roush.pdfbox.rendering.PDFRenderer;
+import com.example.staffpad.utils.SharedPreferencesHelper;
+
 
 import java.io.File;
 import java.io.IOException;
 
 public class SheetDetailFragment extends Fragment {
-
+    private static final String TAG = "SheetDetailFragment";
     private static final String ARG_SHEET_ID = "sheet_id";
     private long sheetId = -1;
     private SheetViewModel sheetViewModel;
     private PhotoView photoView;
+
+    private SharedPreferencesHelper preferencesHelper;
+    private long currentSheetId = -1;
+    private int currentPageNumber = 0;
 
     public SheetDetailFragment() {
         // Required empty public constructor
@@ -46,11 +52,13 @@ public class SheetDetailFragment extends Fragment {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         if (getArguments() != null) {
-            sheetId = getArguments().getLong(ARG_SHEET_ID);
+            sheetId = getArguments().getLong(ARG_SHEET_ID, -1);
         }
 
         // Initialize ViewModel
         sheetViewModel = new ViewModelProvider(requireActivity()).get(SheetViewModel.class);
+        preferencesHelper = new SharedPreferencesHelper(requireContext());
+
     }
 
     @Override
@@ -139,5 +147,36 @@ public class SheetDetailFragment extends Fragment {
             canvas.drawText("Error loading PDF: " + e.getMessage(), 400, 300, paint);
             photoView.setImageBitmap(errorBitmap);
         }
+    }
+
+    public void onPageChanged(int newPageNumber) {
+        this.currentPageNumber = newPageNumber;
+
+        // Save immediately on page change
+        if (currentSheetId != -1) {
+            preferencesHelper.saveLastViewedPage(currentSheetId, currentPageNumber);
+            Log.d(TAG, "Saved current page: " + currentPageNumber + " for sheet: " + currentSheetId);
+        }
+    }
+
+    @Override
+    public void onPause() {
+        super.onPause();
+
+        // Save the current page when leaving the fragment
+        if (currentSheetId != -1) {
+            preferencesHelper.saveLastViewedPage(currentSheetId, currentPageNumber);
+            Log.d(TAG, "onPause: Saved last viewed page: " + currentPageNumber);
+        }
+    }
+
+    public void setCurrentPage(int pageNumber) {
+        this.currentPageNumber = pageNumber;
+
+        // Implementation depends on your PDF/Sheet viewer
+        // For example, if using PdfRenderer:
+        // pdfView.jumpTo(pageNumber);
+
+        Log.d(TAG, "Setting current page to: " + pageNumber);
     }
 }

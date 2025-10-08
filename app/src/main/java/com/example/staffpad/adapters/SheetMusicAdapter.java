@@ -90,7 +90,7 @@ public class SheetMusicAdapter extends RecyclerView.Adapter<SheetMusicAdapter.Sh
         SheetEntity entity = new SheetEntity(
                 sheetMusic.getTitle(),
                 sheetMusic.getFilename(),
-                "", // you may need to provide filePath from somewhere
+                sheetMusic.getFilePath(), // ← Use the actual file path!
                 sheetMusic.getFileSize(),
                 sheetMusic.getPageCount()
         );

@@ -4,6 +4,7 @@ import android.app.Application;
 import android.util.Log;
 
 import androidx.lifecycle.LiveData;
+import androidx.lifecycle.MediatorLiveData;
 import androidx.lifecycle.Transformations;
 
 import com.example.staffpad.data_model.SheetMusic;
@@ -159,5 +160,32 @@ public class SheetMusicRepository {
         });
     }
 
+    public LiveData<SheetMusic> getSheetMusicById(long sheetId) {
+        // Use MediatorLiveData to transform Entity to SheetMusic object
+        MediatorLiveData<SheetMusic> result = new MediatorLiveData<>();
 
+        // First get the basic sheet entity
+        LiveData<SheetEntity> sheetEntityLiveData = database.sheetDao().getSheetById(sheetId);
+
+        result.addSource(sheetEntityLiveData, sheetEntity -> {
+            if (sheetEntity == null) {
+                result.setValue(null);
+                return;
+            }
+
+            // Create SheetMusic object from entity
+            SheetMusic sheetMusic = new SheetMusic(sheetEntity);
+
+            // Load related data (assuming these are your related tables)
+            // Note: In a production app, you'd want to load these more efficiently with a single query
+
+            // Add any additional relation loading here...
+            // For example:
+            // sheetMusic.setTags(getTagsForSheet(sheetId));
+
+            result.setValue(sheetMusic);
+        });
+
+        return result;
+    }
 }

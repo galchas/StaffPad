@@ -51,6 +51,8 @@ import com.example.staffpad.database.repository.LibraryRepository;
 import com.example.staffpad.database.repository.SheetMusicRepository;
 import com.example.staffpad.viewmodel.SheetViewModel;
 
+import com.example.staffpad.utils.SharedPreferencesHelper;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -59,21 +61,20 @@ import java.util.Map;
 import java.util.function.Function;
 
 public class MainActivity extends AppCompatActivity {
+    public enum FilterType {
+        NONE, COMPOSERS, TAGS, LABELS, GENRES
+    }
     public FilterType getCurrentFilter() {
         return currentFilter;
     }
+    private SharedPreferencesHelper preferencesHelper;
 
     public void setCurrentFilter(FilterType currentFilter) {
         this.currentFilter = currentFilter;
     }
 
-    private enum FilterType {
-        NONE, COMPOSERS, TAGS, LABELS, GENRES
-    }
-
     private FilterType currentFilter = FilterType.NONE;
     private Library currentLibrary = null; // Track the currently selected library
-
     private MotionLayout motionLayout;
     private View scrimOverlay;
 
@@ -122,6 +123,7 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
         database = AppDatabase.getDatabase(getApplicationContext());
         sheetViewModel = new SheetViewModel(getApplication());
+        preferencesHelper = new SharedPreferencesHelper(this);
 
         // Initialize views
         initializeViews();
@@ -161,12 +163,75 @@ public class MainActivity extends AppCompatActivity {
         });
 
         if (savedInstanceState == null) {
-            // You might want to show a "select a sheet" message initially
-            getSupportFragmentManager().beginTransaction()
-                    .add(R.id.content_container, new SheetDetailFragment())
-                    .commit();
+            if (preferencesHelper.hasLastViewInformation()) {
+                long lastSheetId = preferencesHelper.getLastViewedSheetId();
+                int lastPageNumber = preferencesHelper.getLastViewedPageNumber();
+
+                Log.d("MainActivity", "Restoring last viewed sheet: " + lastSheetId +
+                        ", page: " + lastPageNumber);
+
+                // Load the last viewed sheet
+                restoreLastViewedSheet(lastSheetId, lastPageNumber);
+            } else {
+                // No last view information, show empty detail view
+                getSupportFragmentManager().beginTransaction()
+                        .add(R.id.content_container, new SheetDetailFragment())
+                        .commit();
+            }
         }
 
+    }
+
+    private void restoreLastViewedSheet(long sheetId, int pageNumber) {
+        // Create a progress dialog for loading
+        ProgressDialog progressDialog = new ProgressDialog(this);
+        progressDialog.setMessage("Loading last viewed sheet...");
+        progressDialog.setCancelable(false);
+        progressDialog.show();
+
+        // Use the SheetViewModel to get the sheet by ID
+        sheetViewModel.getSheetMusicById(sheetId).observe(this, sheetMusic -> {
+            progressDialog.dismiss();
+
+            if (sheetMusic != null) {
+                Log.d("MainActivity", "Found last sheet: " + sheetMusic.getTitle());
+
+                // Create detail fragment with the sheet ID
+                SheetDetailFragment detailFragment = SheetDetailFragment.newInstance(sheetId);
+
+                // Replace or add the fragment
+                getSupportFragmentManager().beginTransaction()
+                        .replace(R.id.content_container, detailFragment)
+                        .commit();
+
+                // Set the current page after fragment has been created
+                new Handler().postDelayed(() -> {
+                    SheetDetailFragment fragment = (SheetDetailFragment) getSupportFragmentManager()
+                            .findFragmentById(R.id.content_container);
+
+                    if (fragment != null) {
+                        fragment.setCurrentPage(pageNumber);
+                    }
+                }, 300); // Short delay to ensure fragment is ready
+
+                // Update toolbar title
+                updateToolbarTitle(sheetMusic.getTitle());
+
+                // Update ViewModel's selected sheet
+                sheetViewModel.selectSheet(sheetId);
+            } else {
+                // Sheet not found (might have been deleted)
+                Log.w("MainActivity", "Last viewed sheet not found: " + sheetId);
+
+                // Clear the preferences and show empty detail
+                preferencesHelper.clearAllPreferences();
+
+                // Show default fragment
+                getSupportFragmentManager().beginTransaction()
+                        .add(R.id.content_container, new SheetDetailFragment())
+                        .commit();
+            }
+        });
     }
 
     private void initializeViews() {
@@ -1512,8 +1577,9 @@ public class MainActivity extends AppCompatActivity {
         // Create "All Sheets" option at the top
         View allSheetsHeader = dialogView.findViewById(R.id.all_sheets_option);
         TextView allSheetsText = allSheetsHeader.findViewById(R.id.all_sheets_text);
+        TextView all_sheets_count = allSheetsHeader.findViewById(R.id.all_sheets_count);
         allSheetsText.setText("All Sheets");
-
+        all_sheets_count.setText(sheetViewModel.getAllSheets() + " sheets");
         // Set click listener for "All Sheets" option
         allSheetsHeader.setOnClickListener(v -> {
             // Load all sheets

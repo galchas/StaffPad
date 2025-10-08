@@ -5,6 +5,8 @@ import android.os.Parcelable;
 
 import androidx.annotation.NonNull;
 
+import com.example.staffpad.database.SheetEntity;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -30,13 +32,28 @@ public class SheetMusic implements Parcelable {
         this.title = title;
         this.filename = filename;
         this.fileSize = fileSize;
-        this.filePath = filePath;
+        this.filePath = filePath; // ← Make sure this is set correctly!
         this.pageCount = pageCount;
-        this.filePath = filename;
         this.key = "C Major";  // Default key
     }
 
-    protected SheetMusic(Parcel in) {
+    public SheetMusic(SheetEntity sheet) {
+        id = sheet.getId();
+        title = sheet.getTitle();
+        filename = sheet.getFilename();
+        fileSize = sheet.getFileSize();
+        pageCount = sheet.getPageCount();
+        composers = sheet.getComposers();
+        genres = sheet.getGenres();
+        labels = sheet.getLabels();
+        references = sheet.getReferences();
+        rating = sheet.getRating();
+        key = sheet.getKey();
+        filePath = sheet.getFilePath();
+    }
+
+
+    public SheetMusic(Parcel in) {
         id = in.readLong();
         title = in.readString();
         filename = in.readString();

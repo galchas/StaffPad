@@ -48,4 +48,6 @@
     <string name="back">Back</string>
     <string name="sheets">Sheets</string>
     <string name="select_the_libraries_to_include_this_sheet_in">Select the libraries to include this sheet in:</string>
+    <string name="all_sheets">All Sheets</string>
+    <string name="create_new_library">Create New Library</string>
 </resources>

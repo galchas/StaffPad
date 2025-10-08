@@ -11,12 +11,12 @@ import java.util.stream.Collectors;
 public class SheetMusicConverter {
 
     public static SheetMusic fromSheetWithRelations(SheetWithRelations sheetWithRelations) {
-        // Create SheetMusic object with basic data
+        // Create SheetMusic object with basic data - MAKE SURE TO USE getFilePath()!
         SheetMusic sheetMusic = new SheetMusic(
                 sheetWithRelations.sheet.getId(),
                 sheetWithRelations.sheet.getTitle(),
                 sheetWithRelations.sheet.getFilename(),
-                sheetWithRelations.sheet.getFilePath(),
+                sheetWithRelations.sheet.getFilePath(), // ← This is critical!
                 sheetWithRelations.sheet.getFileSize(),
                 sheetWithRelations.sheet.getPageCount()
         );
@@ -26,7 +26,7 @@ public class SheetMusicConverter {
         sheetMusic.setComposers(sheetWithRelations.sheet.getComposers());
         sheetMusic.setGenres(sheetWithRelations.sheet.getGenres());
         sheetMusic.setLabels(sheetWithRelations.sheet.getLabels());
-        sheetMusic.setFilePath(sheetWithRelations.sheet.getFilePath());
+        sheetMusic.setFilePath(sheetWithRelations.sheet.getFilePath()); // ← Set it explicitly too!
         sheetMusic.setReferences(sheetWithRelations.sheet.getReferences());
         sheetMusic.setRating(sheetWithRelations.sheet.getRating());
         sheetMusic.setKey(sheetWithRelations.sheet.getKey());
@@ -69,7 +69,7 @@ public class SheetMusicConverter {
                 entity.getId(),
                 entity.getTitle(),
                 entity.getFilename(),
-                entity.getFilePath(),
+                entity.getFilePath(), // ← Use the actual file path!
                 entity.getFileSize(),
                 entity.getPageCount()
         );
@@ -78,6 +78,7 @@ public class SheetMusicConverter {
         sheetMusic.setComposers(entity.getComposers());
         sheetMusic.setGenres(entity.getGenres());
         sheetMusic.setLabels(entity.getLabels());
+        sheetMusic.setFilePath(entity.getFilePath()); // ← Set it explicitly!
         sheetMusic.setReferences(entity.getReferences());
         sheetMusic.setRating(entity.getRating());
         sheetMusic.setKey(entity.getKey());

@@ -16,8 +16,10 @@ import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
 import androidx.lifecycle.Transformations;
 
+import com.example.staffpad.data_model.SheetMusic;
 import com.example.staffpad.database.AudioEntity;
 import com.example.staffpad.database.SheetEntity;
+import com.example.staffpad.database.repository.SheetMusicRepository;
 import com.example.staffpad.database.repository.SheetRepository;
 import com.tom_roush.pdfbox.pdmodel.PDDocument;
 import com.tom_roush.pdfbox.pdmodel.PDPage;
@@ -102,6 +104,11 @@ public class SheetViewModel extends AndroidViewModel {
     public void selectSheet(long sheetId) {
         selectedSheetId.setValue(sheetId);
         repository.markSheetAsOpened(sheetId);
+    }
+
+    public LiveData<SheetMusic> getSheetMusicById(long sheetId) {
+        SheetMusicRepository repository = new SheetMusicRepository(getApplication());
+        return repository.getSheetMusicById(sheetId);
     }
 
     public LiveData<SheetEntity> getSelectedSheet() {
