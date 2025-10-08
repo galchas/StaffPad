@@ -1142,10 +1142,11 @@ public class MainActivity extends AppCompatActivity {
         BookmarkAdapter bookmarkAdapter = new BookmarkAdapter(bookmarkItems);
         bookmarksRecyclerView.setAdapter(bookmarkAdapter);
 
-        // Set up tools recycler view with grid layout
         toolsRecyclerView.setLayoutManager(new GridLayoutManager(this, 3));
         List<ToolItem> toolItems = getToolItems();
         ToolAdapter toolAdapter = new ToolAdapter(toolItems);
+        toolAdapter.setSheetViewModel(sheetViewModel, this);
+
         toolsRecyclerView.setAdapter(toolAdapter);
 
         // Ensure RecyclerView touch events are handled properly
@@ -1174,10 +1175,18 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void onSheetItemClick(SheetMusic sheet) {
+        // Log that we're handling a click
+        Log.d("MainActivity", "onSheetItemClick called for: " + sheet.getTitle() + " (ID: " + sheet.getId() + ")");
+
         // Close the sidebar if it's not locked
         if (currentSidebar != null && !sidebarLocked) {
             closeSidebars();
         }
+
+        // ⭐ CRITICAL FIX: Select the sheet in the ViewModel
+        // This line was MISSING - add it here!
+        sheetViewModel.selectSheet(sheet.getId());
+        Log.d("MainActivity", "✓ Sheet selected in ViewModel with ID: " + sheet.getId());
 
         // Create the detail fragment with the selected sheet ID
         SheetDetailFragment detailFragment = SheetDetailFragment.newInstance(sheet.getId());
@@ -1187,9 +1196,6 @@ public class MainActivity extends AppCompatActivity {
                 .replace(R.id.content_container, detailFragment)
                 .addToBackStack(null) // This allows back button to return to previous state
                 .commit();
-
-        // Also update the ViewModel's selected sheet
-        sheetViewModel.selectSheet(sheet.getId());
 
         // Update toolbar title
         updateToolbarTitle(sheet.getTitle());
@@ -1211,11 +1217,14 @@ public class MainActivity extends AppCompatActivity {
         return items;
     }
 
+
+// Step 1: Add Crop tool to MainActivity.getToolItems() method:
+
     private List<ToolItem> getToolItems() {
         List<ToolItem> items = new ArrayList<>();
         items.add(new ToolItem("Annotate", R.drawable.round_edit_note_24));
         items.add(new ToolItem("Rearrange", R.drawable.round_edit_note_24));
-        items.add(new ToolItem("Crop", R.drawable.round_home_24));
+        items.add(new ToolItem("Crop", R.drawable.ic_crop)); // Add crop tool
         items.add(new ToolItem("Backup", R.drawable.round_home_24));
         items.add(new ToolItem("Restore", R.drawable.round_home_24));
         items.add(new ToolItem("Settings", R.drawable.ic_info));
