@@ -20,9 +20,10 @@ import java.util.concurrent.Executors;
                 SheetSetlistCrossRef.class,
                 SheetLibraryCrossRef.class,
                 SheetTagCrossRef.class,
-                LibraryEntity.class // Add LibraryEntity here!
+                LibraryEntity.class,
+                PageLayerEntity.class
         },
-        version = 1,
+        version = 2,
         exportSchema = false
 )
 public abstract class AppDatabase extends RoomDatabase {
@@ -31,6 +32,7 @@ public abstract class AppDatabase extends RoomDatabase {
     public abstract AudioDao audioDao();
     public abstract TagDao tagDao();
     public abstract LibraryDao libraryDao();
+    public abstract PageLayerDao pageLayerDao();
     private static volatile AppDatabase INSTANCE;
     private static final int NUMBER_OF_THREADS = 4;
     public static final ExecutorService databaseWriteExecutor =
@@ -44,6 +46,7 @@ public abstract class AppDatabase extends RoomDatabase {
                                     context.getApplicationContext(),
                                     AppDatabase.class,
                                     "staffpad_database")
+                            .fallbackToDestructiveMigration()
                             .addCallback(sRoomDatabaseCallback)
                             .build();
                 }

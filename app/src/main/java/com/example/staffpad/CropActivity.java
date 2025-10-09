@@ -1,12 +1,12 @@
 package com.example.staffpad;
 
-import android.content.Intent;
 import android.graphics.Bitmap;
+import android.graphics.Matrix;
 import android.graphics.RectF;
 import android.os.Bundle;
-import android.os.Handler;
 import android.util.Log;
-import android.view.MotionEvent;
+import android.view.View;
+import android.widget.Button;
 import android.widget.ImageButton;
 import android.widget.SeekBar;
 import android.widget.TextView;
@@ -15,110 +15,117 @@ import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.example.staffpad.views.CropImageView;
+import com.example.staffpad.database.AppDatabase;
+import com.example.staffpad.database.PageLayerDao;
+import com.example.staffpad.database.PageLayerEntity;
 import com.tom_roush.pdfbox.pdmodel.PDDocument;
 import com.tom_roush.pdfbox.rendering.PDFRenderer;
+import android.os.ParcelFileDescriptor;
+import android.graphics.pdf.PdfRenderer;
 
 import java.io.File;
+import java.io.IOException;
 
 public class CropActivity extends AppCompatActivity {
-
     private static final String TAG = "CropActivity";
 
     public static final String EXTRA_SHEET_ID = "sheet_id";
     public static final String EXTRA_PAGE_NUMBER = "page_number";
+    public static final String EXTRA_FILE_PATH = "file_path";
 
     private CropImageView cropImageView;
+    private ImageButton rotateLeftButton;
+    private ImageButton rotateRightButton;
+    private ImageButton resetButton;
+    private Button applyButton;
+    private Button cancelButton;
+    private SeekBar brightnessSeekBar;
+    private SeekBar contrastSeekBar;
     private SeekBar rotationSeekBar;
-    private TextView rotationValueText;
-    private TextView pageIndicatorText;
-    private ImageButton prevPageButton;
-    private ImageButton nextPageButton;
-    private ImageButton rotateLeftFineButton;
-    private ImageButton rotateRightFineButton;
+    private TextView brightnessLabel;
+    private TextView contrastLabel;
+    private TextView rotationLabel;
 
     private long sheetId;
-    private int currentPage = 0;
-    private int totalPages = 0;
-    private String pdfFilePath;
-
-    private PDDocument pdfDocument;
-    private PDFRenderer pdfRenderer;
-
-    // Continuous rotation
-    private Handler rotationHandler = new Handler();
-    private Runnable rotationRunnable;
-    private boolean isRotating = false;
+    private int pageNumber;
+    private String filePath;
+    private Bitmap originalBitmap;
+    private PDDocument document;
+    private float currentRotation = 0f;
+    private float brightness = 0f; // -100 to 100
+    private float contrast = 1f; // 0.5 to 2.0
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_crop);
 
-        Log.d(TAG, "CropActivity started");
-
         // Get extras
         sheetId = getIntent().getLongExtra(EXTRA_SHEET_ID, -1);
-        currentPage = getIntent().getIntExtra(EXTRA_PAGE_NUMBER, 0);
+        pageNumber = getIntent().getIntExtra(EXTRA_PAGE_NUMBER, 0);
+        filePath = getIntent().getStringExtra(EXTRA_FILE_PATH);
 
-        if (sheetId == -1) {
-            Log.e(TAG, "Invalid sheet ID");
-            Toast.makeText(this, "Error: Invalid sheet ID", Toast.LENGTH_SHORT).show();
+        if (sheetId == -1 || filePath == null) {
+            Toast.makeText(this, "Error: Invalid sheet data", Toast.LENGTH_SHORT).show();
             finish();
             return;
         }
 
-        Log.d(TAG, "Loading sheet ID: " + sheetId + ", page: " + currentPage);
-
-        // Initialize views
-        initViews();
-
-        // Setup listeners
+        initializeViews();
         setupListeners();
-
-        // Load PDF
-        loadPdfForSheet();
+        loadPage();
     }
 
-    private void initViews() {
+    private void initializeViews() {
         cropImageView = findViewById(R.id.crop_image_view);
+        rotateLeftButton = findViewById(R.id.rotate_left_button);
+        rotateRightButton = findViewById(R.id.rotate_right_button);
+        resetButton = findViewById(R.id.reset_button);
+        applyButton = findViewById(R.id.apply_button);
+        cancelButton = findViewById(R.id.cancel_button);
+        brightnessSeekBar = findViewById(R.id.brightness_seekbar);
+        contrastSeekBar = findViewById(R.id.contrast_seekbar);
         rotationSeekBar = findViewById(R.id.rotation_seekbar);
-        rotationValueText = findViewById(R.id.rotation_value);
-        pageIndicatorText = findViewById(R.id.page_indicator);
-        prevPageButton = findViewById(R.id.prev_page_button);
-        nextPageButton = findViewById(R.id.next_page_button);
-        rotateLeftFineButton = findViewById(R.id.rotate_left_fine);
-        rotateRightFineButton = findViewById(R.id.rotate_right_fine);
+        brightnessLabel = findViewById(R.id.brightness_label);
+        contrastLabel = findViewById(R.id.contrast_label);
+        rotationLabel = findViewById(R.id.rotation_label);
+
+        // Setup seekbars
+        brightnessSeekBar.setMax(200); // -100 to 100
+        brightnessSeekBar.setProgress(100); // 0 in the middle
+
+        contrastSeekBar.setMax(150); // 0.5 to 2.0
+        contrastSeekBar.setProgress(50); // 1.0 in the middle
     }
 
     private void setupListeners() {
-        // Cancel button
-        findViewById(R.id.cancel_button).setOnClickListener(v -> {
-            Log.d(TAG, "Cancel button clicked");
-            finish();
-        });
+        rotateLeftButton.setOnClickListener(v -> rotateImage(-90));
+        rotateRightButton.setOnClickListener(v -> rotateImage(90));
+        resetButton.setOnClickListener(v -> resetImage());
+        applyButton.setOnClickListener(v -> applyChanges());
+        cancelButton.setOnClickListener(v -> finish());
 
-        // Done button
-        findViewById(R.id.done_button).setOnClickListener(v -> {
-            Log.d(TAG, "Done button clicked");
-            saveCropSettings();
-        });
-
-        // Reset button
-        findViewById(R.id.reset_button).setOnClickListener(v -> {
-            Log.d(TAG, "Reset button clicked");
-            cropImageView.reset();
-            rotationSeekBar.setProgress(4500); // Reset to 0 degrees (middle of range)
-        });
-
-        // Rotation seekbar - much more sensitive with 0.01 degree precision
+        // Fine rotation: map 0..200 to -10..+10 degrees
+        rotationSeekBar.setMax(200);
+        rotationSeekBar.setProgress(100); // center -> 0°
         rotationSeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
             public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                // Convert 0-9000 to -45 to +45 degrees with 0.01 degree precision
-                // 9000 steps for 90 degree range = 0.01 degree per step
-                float angle = (progress - 4500) / 100.0f;
-                cropImageView.setRotation(angle);
-                rotationValueText.setText(String.format("%.2f°", angle));
+                float degrees = (progress - 100) / 100f * 10f; // -10..+10
+                currentRotation = degrees;
+                rotationLabel.setText(String.format("Align: %.1f°", degrees));
+                cropImageView.setRotation(currentRotation);
+            }
+            @Override public void onStartTrackingTouch(SeekBar seekBar) {}
+            @Override public void onStopTrackingTouch(SeekBar seekBar) {}
+        });
+
+        brightnessSeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                brightness = (progress - 100); // Convert to -100 to 100
+                brightnessLabel.setText(String.format("Brightness: %d", (int)brightness));
+                applyFilters();
             }
 
             @Override
@@ -128,280 +135,243 @@ public class CropActivity extends AppCompatActivity {
             public void onStopTrackingTouch(SeekBar seekBar) {}
         });
 
-        // Set seekbar to middle (0 degrees)
-        rotationSeekBar.setProgress(4500);
-
-        // Fine rotation buttons - 0.01 degree increments
-        rotateLeftFineButton.setOnClickListener(v -> {
-            int currentProgress = rotationSeekBar.getProgress();
-            rotationSeekBar.setProgress(currentProgress - 1); // -0.01 degree
-        });
-
-        rotateRightFineButton.setOnClickListener(v -> {
-            int currentProgress = rotationSeekBar.getProgress();
-            rotationSeekBar.setProgress(currentProgress + 1); // +0.01 degree
-        });
-
-        // Long press for continuous rotation
-        rotateLeftFineButton.setOnLongClickListener(v -> {
-            startContinuousRotation(-1);
-            return true;
-        });
-
-        rotateRightFineButton.setOnLongClickListener(v -> {
-            startContinuousRotation(1);
-            return true;
-        });
-
-        // Stop continuous rotation on touch release
-        rotateLeftFineButton.setOnTouchListener((v, event) -> {
-            if (event.getAction() == MotionEvent.ACTION_UP ||
-                    event.getAction() == MotionEvent.ACTION_CANCEL) {
-                stopContinuousRotation();
+        contrastSeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                contrast = 0.5f + (progress / 100f) * 1.5f; // Convert to 0.5 to 2.0
+                contrastLabel.setText(String.format("Contrast: %.2f", contrast));
+                applyFilters();
             }
-            return false;
-        });
 
-        rotateRightFineButton.setOnTouchListener((v, event) -> {
-            if (event.getAction() == MotionEvent.ACTION_UP ||
-                    event.getAction() == MotionEvent.ACTION_CANCEL) {
-                stopContinuousRotation();
-            }
-            return false;
-        });
+            @Override
+            public void onStartTrackingTouch(SeekBar seekBar) {}
 
-        // Page navigation
-        prevPageButton.setOnClickListener(v -> {
-            if (currentPage > 0) {
-                currentPage--;
-                loadPage(currentPage);
-            }
-        });
-
-        nextPageButton.setOnClickListener(v -> {
-            if (currentPage < totalPages - 1) {
-                currentPage++;
-                loadPage(currentPage);
-            }
-        });
-
-        // Auto crop button
-        findViewById(R.id.auto_crop_button).setOnClickListener(v -> {
-            Toast.makeText(this, "Auto crop coming soon!", Toast.LENGTH_SHORT).show();
-        });
-
-        // Apply to all button
-        findViewById(R.id.apply_to_all_button).setOnClickListener(v -> {
-            Toast.makeText(this, "Apply to all pages coming soon!", Toast.LENGTH_SHORT).show();
-        });
-
-        // Crop change listener
-        cropImageView.setCropChangeListener((cropRect, rotation) -> {
-            // Optional: Save intermediate changes or show preview
+            @Override
+            public void onStopTrackingTouch(SeekBar seekBar) {}
         });
     }
 
-    private void loadPdfForSheet() {
-        Log.d(TAG, "Loading PDF for sheet ID: " + sheetId);
-
-        // Get PDF file path from database
+    private void loadPage() {
         new Thread(() -> {
             try {
-                // Get sheet from database
-                com.example.staffpad.database.AppDatabase database =
-                        com.example.staffpad.database.AppDatabase.getDatabase(getApplicationContext());
-
-                // Use repository to get sheet
-                com.example.staffpad.database.repository.SheetRepository repository =
-                        new com.example.staffpad.database.repository.SheetRepository(getApplication());
-
-                // Observe on main thread
-                runOnUiThread(() -> {
-                    repository.getSheetById(sheetId).observe(this, sheet -> {
-                        if (sheet == null) {
-                            Log.e(TAG, "Sheet not found in database");
-                            Toast.makeText(this, "Error: Sheet not found", Toast.LENGTH_SHORT).show();
-                            finish();
-                            return;
-                        }
-
-                        pdfFilePath = sheet.getFilePath();
-                        Log.d(TAG, "PDF file path: " + pdfFilePath);
-                        loadPdfFile();
-                    });
-                });
-
-            } catch (Exception e) {
-                Log.e(TAG, "Error loading sheet", e);
-                runOnUiThread(() -> {
-                    Toast.makeText(this, "Error loading sheet: " + e.getMessage(),
-                            Toast.LENGTH_LONG).show();
-                    finish();
-                });
-            }
-        }).start();
-    }
-
-    private void loadPdfFile() {
-        Log.d(TAG, "Loading PDF file: " + pdfFilePath);
-
-        new Thread(() -> {
-            try {
-                // Load PDF
-                File pdfFile = new File(pdfFilePath);
+                File pdfFile = new File(filePath);
                 if (!pdfFile.exists()) {
-                    Log.e(TAG, "PDF file not found: " + pdfFilePath);
-                    runOnUiThread(() -> {
+                    runOnUiThreadSafe(() -> {
                         Toast.makeText(this, "Error: PDF file not found", Toast.LENGTH_SHORT).show();
                         finish();
                     });
                     return;
                 }
 
-                Log.d(TAG, "PDF file exists, loading document");
-                pdfDocument = PDDocument.load(pdfFile);
-                pdfRenderer = new PDFRenderer(pdfDocument);
-                totalPages = pdfDocument.getNumberOfPages();
+                document = PDDocument.load(pdfFile);
+                PDFRenderer renderer = new PDFRenderer(document);
 
-                Log.d(TAG, "PDF loaded successfully, " + totalPages + " pages");
+                if (pageNumber >= document.getNumberOfPages()) {
+                    pageNumber = 0;
+                }
 
-                // Load initial page
-                runOnUiThread(() -> {
-                    updatePageIndicator();
-                    loadPage(currentPage);
+                // Render at high resolution for better quality with fallback
+                try {
+                    originalBitmap = renderer.renderImage(pageNumber, 2.0f);
+                } catch (Throwable t) {
+                    Log.e(TAG, "PdfBox render failed in CropActivity, using Android PdfRenderer", t);
+                    originalBitmap = renderWithAndroidPdfRenderer(new File(filePath), pageNumber, 2.0f);
+                }
+
+                runOnUiThreadSafe(() -> {
+                    if (originalBitmap != null) {
+                        cropImageView.setImageBitmap(originalBitmap);
+                        Log.d(TAG, "Page loaded successfully");
+                    } else {
+                        Toast.makeText(this, "Error loading page", Toast.LENGTH_SHORT).show();
+                        finish();
+                    }
                 });
 
-            } catch (Exception e) {
-                Log.e(TAG, "Error loading PDF file", e);
+            } catch (IOException e) {
+                Log.e(TAG, "Error loading PDF", e);
                 runOnUiThread(() -> {
-                    Toast.makeText(this, "Error loading PDF: " + e.getMessage(),
-                            Toast.LENGTH_LONG).show();
+                    Toast.makeText(this, "Error loading PDF: " + e.getMessage(), Toast.LENGTH_SHORT).show();
                     finish();
                 });
             }
         }).start();
     }
 
-    private void loadPage(int pageNumber) {
-        if (pdfRenderer == null) {
-            Log.e(TAG, "PDF renderer is null");
-            return;
+    private void rotateImage(float degrees) {
+        // Nudge rotation slightly within -10..+10 degrees range
+        currentRotation += degrees;
+        if (currentRotation > 10f) currentRotation = 10f;
+        if (currentRotation < -10f) currentRotation = -10f;
+        cropImageView.setRotation(currentRotation);
+        // Sync UI seekbar and label if available
+        if (rotationSeekBar != null) {
+            int progress = (int) ((currentRotation / 10f) * 100f) + 100; // map back to 0..200
+            rotationSeekBar.setProgress(progress);
+        }
+        if (rotationLabel != null) {
+            rotationLabel.setText(String.format("Align: %.1f°", currentRotation));
+        }
+        Log.d(TAG, "Rotated to: " + currentRotation);
+    }
+
+    private void resetImage() {
+        currentRotation = 0f;
+        brightness = 0f;
+        contrast = 1f;
+
+        cropImageView.setRotation(0);
+        cropImageView.resetCrop();
+        brightnessSeekBar.setProgress(100);
+        contrastSeekBar.setProgress(50);
+        if (rotationSeekBar != null) rotationSeekBar.setProgress(100);
+        if (rotationLabel != null) rotationLabel.setText("Align: 0°");
+
+        if (originalBitmap != null) {
+            cropImageView.setImageBitmap(originalBitmap);
         }
 
-        Log.d(TAG, "Loading page " + pageNumber);
+        Toast.makeText(this, "Reset to original", Toast.LENGTH_SHORT).show();
+    }
+
+    private void applyFilters() {
+        if (originalBitmap == null) return;
+
+        new Thread(() -> {
+            Bitmap filteredBitmap = adjustBrightnessContrast(originalBitmap, brightness, contrast);
+            runOnUiThreadSafe(() -> cropImageView.setImageBitmap(filteredBitmap));
+        }).start();
+    }
+
+    private Bitmap adjustBrightnessContrast(Bitmap bitmap, float brightness, float contrast) {
+        Bitmap result = bitmap.copy(bitmap.getConfig(), true);
+
+        int width = result.getWidth();
+        int height = result.getHeight();
+        int[] pixels = new int[width * height];
+        result.getPixels(pixels, 0, width, 0, 0, width, height);
+
+        for (int i = 0; i < pixels.length; i++) {
+            int pixel = pixels[i];
+            int a = (pixel >> 24) & 0xff;
+            int r = (pixel >> 16) & 0xff;
+            int g = (pixel >> 8) & 0xff;
+            int b = pixel & 0xff;
+
+            // Apply contrast
+            r = (int)((r - 128) * contrast + 128);
+            g = (int)((g - 128) * contrast + 128);
+            b = (int)((b - 128) * contrast + 128);
+
+            // Apply brightness
+            r += brightness;
+            g += brightness;
+            b += brightness;
+
+            // Clamp values
+            r = Math.max(0, Math.min(255, r));
+            g = Math.max(0, Math.min(255, g));
+            b = Math.max(0, Math.min(255, b));
+
+            pixels[i] = (a << 24) | (r << 16) | (g << 8) | b;
+        }
+
+        result.setPixels(pixels, 0, width, 0, 0, width, height);
+        return result;
+    }
+
+    private void applyChanges() {
+        Toast.makeText(this, "Saving as new layer...", Toast.LENGTH_SHORT).show();
 
         new Thread(() -> {
             try {
-                // Render page to bitmap
-                Bitmap bitmap = pdfRenderer.renderImage(pageNumber);
-                Log.d(TAG, "Page rendered: " + bitmap.getWidth() + "x" + bitmap.getHeight());
+                // Get normalized crop bounds (0..1)
+                RectF cropBounds = cropImageView.getCropBounds();
+                if (cropBounds == null) {
+                    runOnUiThread(() -> Toast.makeText(this, "Error: Could not read crop bounds", Toast.LENGTH_SHORT).show());
+                    return;
+                }
+
+                AppDatabase db = AppDatabase.getDatabase(getApplicationContext());
+                PageLayerDao dao = db.pageLayerDao();
+
+                // Determine next order index
+                int maxOrder = dao.getMaxOrderIndex(sheetId, pageNumber);
+                int nextOrder = maxOrder + 1;
+
+                // Create and populate layer entity
+                PageLayerEntity layer = new PageLayerEntity(sheetId, pageNumber, "Layer " + nextOrder, "CROP");
+                layer.setOrderIndex(nextOrder);
+                layer.setActive(true);
+                layer.setCropLeft(cropBounds.left);
+                layer.setCropTop(cropBounds.top);
+                layer.setCropRight(cropBounds.right);
+                layer.setCropBottom(cropBounds.bottom);
+                layer.setRotation(currentRotation);
+                layer.setBrightness(brightness);
+                layer.setContrast(contrast);
+                layer.setModifiedAt(System.currentTimeMillis());
+
+                dao.insert(layer);
 
                 runOnUiThread(() -> {
-                    cropImageView.setImageBitmap(bitmap);
-                    updatePageIndicator();
-                    updateNavigationButtons();
-
-                    // Load saved crop settings for this page if available
-                    loadCropSettingsForPage(pageNumber);
+                    Toast.makeText(this, "Layer saved", Toast.LENGTH_SHORT).show();
+                    setResult(RESULT_OK);
+                    finish();
                 });
 
             } catch (Exception e) {
-                Log.e(TAG, "Error loading page " + pageNumber, e);
-                runOnUiThread(() -> {
-                    Toast.makeText(this, "Error loading page: " + e.getMessage(),
-                            Toast.LENGTH_SHORT).show();
-                });
+                Log.e(TAG, "Error saving layer", e);
+                runOnUiThread(() -> Toast.makeText(this, "Error: " + e.getMessage(), Toast.LENGTH_LONG).show());
             }
         }).start();
     }
 
-    private void updatePageIndicator() {
-        pageIndicatorText.setText(String.format("Page %d of %d",
-                currentPage + 1, totalPages));
-    }
-
-    private void updateNavigationButtons() {
-        prevPageButton.setEnabled(currentPage > 0);
-        nextPageButton.setEnabled(currentPage < totalPages - 1);
-
-        // Update button alpha to show enabled/disabled state
-        prevPageButton.setAlpha(currentPage > 0 ? 1.0f : 0.3f);
-        nextPageButton.setAlpha(currentPage < totalPages - 1 ? 1.0f : 0.3f);
-    }
-
-    private void loadCropSettingsForPage(int pageNumber) {
-        // TODO: Load saved crop settings from database
-        // For now, we'll use default (full page)
-        Log.d(TAG, "Loading crop settings for page " + pageNumber + " (not yet implemented)");
-    }
-
-    private void saveCropSettings() {
-        RectF cropRect = cropImageView.getCropRect();
-        float rotation = cropImageView.getRotation();
-
-        Log.d(TAG, "Saving crop settings - Rotation: " + rotation + "°");
-        Log.d(TAG, "Crop rect: " + cropRect.toString());
-
-        // TODO: Save to database
-        Toast.makeText(this,
-                String.format("Crop saved: Rotation=%.2f°", rotation),
-                Toast.LENGTH_SHORT).show();
-
-        // Return result
-        setResult(RESULT_OK);
-        finish();
-    }
-
-    private void startContinuousRotation(int direction) {
-        if (isRotating) return;
-
-        Log.d(TAG, "Starting continuous rotation, direction: " + direction);
-        isRotating = true;
-        rotationRunnable = new Runnable() {
-            @Override
-            public void run() {
-                if (isRotating) {
-                    int currentProgress = rotationSeekBar.getProgress();
-                    int newProgress = currentProgress + direction;
-
-                    // Clamp to valid range
-                    if (newProgress >= 0 && newProgress <= 9000) {
-                        rotationSeekBar.setProgress(newProgress);
-                        rotationHandler.postDelayed(this, 50); // Update every 50ms
-                    } else {
-                        stopContinuousRotation();
-                    }
-                }
-            }
-        };
-        rotationHandler.post(rotationRunnable);
-    }
-
-    private void stopContinuousRotation() {
-        Log.d(TAG, "Stopping continuous rotation");
-        isRotating = false;
-        if (rotationRunnable != null) {
-            rotationHandler.removeCallbacks(rotationRunnable);
-        }
-    }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
-
-        Log.d(TAG, "CropActivity destroyed");
-
-        // Stop continuous rotation
-        stopContinuousRotation();
-
-        // Clean up PDF resources
-        if (pdfDocument != null) {
+        if (document != null) {
             try {
-                pdfDocument.close();
-                Log.d(TAG, "PDF document closed");
-            } catch (Exception e) {
-                Log.e(TAG, "Error closing PDF document", e);
+                document.close();
+            } catch (IOException e) {
+                Log.e(TAG, "Error closing document", e);
             }
         }
+        if (originalBitmap != null && !originalBitmap.isRecycled()) {
+            originalBitmap.recycle();
+        }
     }
+    private void runOnUiThreadSafe(Runnable action) {
+        if (!isFinishing() && !(android.os.Build.VERSION.SDK_INT >= 17 && isDestroyed())) {
+            runOnUiThread(action);
+        }
+    }
+
+    private Bitmap renderWithAndroidPdfRenderer(File file, int pageIndex, float scale) {
+        ParcelFileDescriptor fd = null;
+        PdfRenderer pdfRenderer = null;
+        PdfRenderer.Page page = null;
+        try {
+            fd = ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY);
+            pdfRenderer = new PdfRenderer(fd);
+            if (pageIndex < 0 || pageIndex >= pdfRenderer.getPageCount()) {
+                pageIndex = 0;
+            }
+            page = pdfRenderer.openPage(pageIndex);
+            int width = Math.max(1, (int) (page.getWidth() * scale));
+            int height = Math.max(1, (int) (page.getHeight() * scale));
+            Bitmap bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+            page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY);
+            return bitmap;
+        } catch (Exception e) {
+            Log.e(TAG, "Android PdfRenderer failed in CropActivity", e);
+            return null;
+        } finally {
+            try { if (page != null) page.close(); } catch (Throwable ignored) {}
+            try { if (pdfRenderer != null) pdfRenderer.close(); } catch (Throwable ignored) {}
+            try { if (fd != null) fd.close(); } catch (Throwable ignored) {}
+        }
+    }
+
 }

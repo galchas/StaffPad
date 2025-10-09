@@ -3,6 +3,7 @@ package com.example.staffpad;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.ProgressDialog;
+import android.content.Context;
 import android.content.Intent;
 import android.database.Cursor;
 import android.graphics.Color;
@@ -113,7 +114,7 @@ public class MainActivity extends AppCompatActivity {
     // State tracking
     private String currentSidebar = null;
     private boolean isToolbarVisible = true;
-
+    private static final int CROP_REQUEST_CODE = 101;
     AppDatabase database;
     SheetViewModel sheetViewModel;
 
@@ -1075,6 +1076,33 @@ public class MainActivity extends AppCompatActivity {
         toolsResizeHandle.setOnTouchListener(toolsHandler);
     }
 
+    private void showLayerManager() {
+        // Get the current fragment
+        SheetDetailFragment fragment = (SheetDetailFragment) getSupportFragmentManager()
+                .findFragmentById(R.id.content_container);
+
+        if (fragment == null) {
+            Toast.makeText(this, "Please open a sheet first", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        long sheetId = fragment.getSheetId();
+        int pageNumber = fragment.getCurrentPage();
+
+        if (sheetId == -1) {
+            Toast.makeText(this, "Please open a sheet first", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        // Show layer manager dialog
+        LayerManagerDialog dialog = LayerManagerDialog.newInstance(sheetId, pageNumber);
+        dialog.setOnLayersChangedListener(() -> {
+            // Refresh the page when layers change
+            fragment.refreshPage();
+        });
+        dialog.show(getSupportFragmentManager(), "layer_manager");
+    }
+
     @SuppressLint("ClickableViewAccessibility")
     private void setupRecyclerViews() {
 //        View libraryContentContainer = findViewById(R.id.library_content_container);
@@ -1145,7 +1173,39 @@ public class MainActivity extends AppCompatActivity {
         toolsRecyclerView.setLayoutManager(new GridLayoutManager(this, 3));
         List<ToolItem> toolItems = getToolItems();
         ToolAdapter toolAdapter = new ToolAdapter(toolItems);
-        toolAdapter.setSheetViewModel(sheetViewModel, this);
+
+        toolAdapter.setOnToolClickListener(toolName -> {
+            switch (toolName) {
+                case "Layers":
+                    showLayerManager();
+                    break;
+                case "Crop":
+                    launchCropActivity();
+                    break;
+                case "Annotate":
+                    Toast.makeText(this, "Annotation feature coming soon", Toast.LENGTH_SHORT).show();
+                    break;
+                case "Rearrange":
+                    Toast.makeText(this, "Rearrange pages coming soon", Toast.LENGTH_SHORT).show();
+                    break;
+                case "Backup":
+                    Toast.makeText(this, "Backup feature coming soon", Toast.LENGTH_SHORT).show();
+                    break;
+                case "Settings":
+                    Toast.makeText(this, "Settings coming soon", Toast.LENGTH_SHORT).show();
+                    break;
+                default:
+                    Toast.makeText(this, toolName + " activated", Toast.LENGTH_SHORT).show();
+                    break;
+            }
+
+            // Close the tools sidebar after selecting a tool
+            closeSidebars();
+        });
+
+
+        toolsRecyclerView.setAdapter(toolAdapter);
+        Log.d("MainActivity", "ToolAdapter connected to SheetViewModel");
 
         toolsRecyclerView.setAdapter(toolAdapter);
 
@@ -1218,19 +1278,99 @@ public class MainActivity extends AppCompatActivity {
     }
 
 
+    private void launchCropActivity() {
+        // Get the currently displayed sheet from the fragment
+        SheetDetailFragment fragment = (SheetDetailFragment) getSupportFragmentManager()
+                .findFragmentById(R.id.content_container);
+
+        if (fragment == null) {
+            Toast.makeText(this, "Please select a sheet first", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        long currentSheetId = fragment.getSheetId();
+
+        if (currentSheetId == -1) {
+            Toast.makeText(this, "Please select a sheet first", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        // Get the current sheet details from ViewModel
+        sheetViewModel.getSheetById(currentSheetId).observe(this, sheet -> {
+            if (sheet != null) {
+                Intent intent = new Intent(this, CropActivity.class);
+                intent.putExtra(CropActivity.EXTRA_SHEET_ID, sheet.getId());
+                intent.putExtra(CropActivity.EXTRA_PAGE_NUMBER, fragment.getCurrentPage());
+                intent.putExtra(CropActivity.EXTRA_FILE_PATH, sheet.getFilePath());
+                startActivityForResult(intent, CROP_REQUEST_CODE);
+            } else {
+                Toast.makeText(this, "Sheet not found", Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
+
+    private int getCurrentPageNumber() {
+        SheetDetailFragment fragment = (SheetDetailFragment) getSupportFragmentManager()
+                .findFragmentById(R.id.content_container);
+
+        if (fragment != null) {
+            return fragment.getCurrentPage();
+        }
+        return 0;
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+
+        if (requestCode == CROP_REQUEST_CODE && resultCode == RESULT_OK) {
+            // Refresh the current page display
+            refreshCurrentPage();
+            Toast.makeText(this, "Page updated successfully", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void refreshCurrentPage() {
+        SheetDetailFragment fragment = (SheetDetailFragment) getSupportFragmentManager()
+                .findFragmentById(R.id.content_container);
+
+        if (fragment != null) {
+            // Get the current sheet ID and page number
+            long sheetId = fragment.getSheetId();
+            int currentPage = fragment.getCurrentPage();
+
+            if (sheetId != -1) {
+                // Create new fragment instance
+                SheetDetailFragment newFragment = SheetDetailFragment.newInstance(sheetId);
+
+                getSupportFragmentManager().beginTransaction()
+                        .replace(R.id.content_container, newFragment)
+                        .commit();
+
+                // Restore the current page after a short delay
+                new Handler().postDelayed(() -> {
+                    SheetDetailFragment restoredFragment = (SheetDetailFragment) getSupportFragmentManager()
+                            .findFragmentById(R.id.content_container);
+                    if (restoredFragment != null) {
+                        restoredFragment.setCurrentPage(currentPage);
+                    }
+                }, 300);
+            }
+        }
+    }
+
 // Step 1: Add Crop tool to MainActivity.getToolItems() method:
 
     private List<ToolItem> getToolItems() {
         List<ToolItem> items = new ArrayList<>();
+        items.add(new ToolItem("Layers", R.drawable.baseline_format_list_bulleted_24)); // NEW
+        items.add(new ToolItem("Crop", R.drawable.ic_crop));
         items.add(new ToolItem("Annotate", R.drawable.round_edit_note_24));
         items.add(new ToolItem("Rearrange", R.drawable.round_edit_note_24));
-        items.add(new ToolItem("Crop", R.drawable.ic_crop)); // Add crop tool
         items.add(new ToolItem("Backup", R.drawable.round_home_24));
-        items.add(new ToolItem("Restore", R.drawable.round_home_24));
         items.add(new ToolItem("Settings", R.drawable.ic_info));
         return items;
     }
-
     private void toggleSidebar(String sidebarName) {
         Log.d("MainActivity", "Toggling sidebar: " + sidebarName + ", Current: " + currentSidebar + ", Locked: " + sidebarLocked);
 

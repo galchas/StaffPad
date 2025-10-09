@@ -50,4 +50,7 @@
     <string name="select_the_libraries_to_include_this_sheet_in">Select the libraries to include this sheet in:</string>
     <string name="all_sheets">All Sheets</string>
     <string name="create_new_library">Create New Library</string>
+    <string name="apply">Apply</string>
+    <string name="add_layer">Add Layer</string>
+    <string name="crop_amp_align_page"><![CDATA[Crop & Align Page]]></string>
 </resources>
