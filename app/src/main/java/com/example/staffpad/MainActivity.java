@@ -2,7 +2,6 @@ package com.example.staffpad;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
-import android.app.ProgressDialog;
 import android.content.Context;
 import android.content.Intent;
 import android.database.Cursor;
@@ -123,7 +122,7 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         database = AppDatabase.getDatabase(getApplicationContext());
-        sheetViewModel = new SheetViewModel(getApplication());
+        sheetViewModel = new androidx.lifecycle.ViewModelProvider(this).get(SheetViewModel.class);
         preferencesHelper = new SharedPreferencesHelper(this);
 
         // Initialize views
@@ -184,55 +183,44 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void restoreLastViewedSheet(long sheetId, int pageNumber) {
-        // Create a progress dialog for loading
-        ProgressDialog progressDialog = new ProgressDialog(this);
-        progressDialog.setMessage("Loading last viewed sheet...");
-        progressDialog.setCancelable(false);
-        progressDialog.show();
+        // Observe ONCE to avoid repeated fragment replacements
+        final androidx.lifecycle.LiveData<com.example.staffpad.data_model.SheetMusic> live = sheetViewModel.getSheetMusicById(sheetId);
+        final androidx.lifecycle.Observer<com.example.staffpad.data_model.SheetMusic> onceObserver = new androidx.lifecycle.Observer<com.example.staffpad.data_model.SheetMusic>() {
+            @Override
+            public void onChanged(com.example.staffpad.data_model.SheetMusic sheetMusic) {
+                live.removeObserver(this);
 
-        // Use the SheetViewModel to get the sheet by ID
-        sheetViewModel.getSheetMusicById(sheetId).observe(this, sheetMusic -> {
-            progressDialog.dismiss();
+                if (sheetMusic != null) {
+                    Log.d("MainActivity", "Found last sheet: " + sheetMusic.getTitle());
 
-            if (sheetMusic != null) {
-                Log.d("MainActivity", "Found last sheet: " + sheetMusic.getTitle());
+                    // Create detail fragment with the sheet ID and initial page to avoid startup race
+                    SheetDetailFragment detailFragment = SheetDetailFragment.newInstance(sheetId, pageNumber);
 
-                // Create detail fragment with the sheet ID
-                SheetDetailFragment detailFragment = SheetDetailFragment.newInstance(sheetId);
+                    // Replace or add the fragment
+                    getSupportFragmentManager().beginTransaction()
+                            .replace(R.id.content_container, detailFragment)
+                            .commit();
 
-                // Replace or add the fragment
-                getSupportFragmentManager().beginTransaction()
-                        .replace(R.id.content_container, detailFragment)
-                        .commit();
+                    // Update toolbar title
+                    updateToolbarTitle(sheetMusic.getTitle());
 
-                // Set the current page after fragment has been created
-                new Handler().postDelayed(() -> {
-                    SheetDetailFragment fragment = (SheetDetailFragment) getSupportFragmentManager()
-                            .findFragmentById(R.id.content_container);
+                    // Update ViewModel's selected sheet
+                    sheetViewModel.selectSheet(sheetId);
+                } else {
+                    // Sheet not found (might have been deleted)
+                    Log.w("MainActivity", "Last viewed sheet not found: " + sheetId);
 
-                    if (fragment != null) {
-                        fragment.setCurrentPage(pageNumber);
-                    }
-                }, 300); // Short delay to ensure fragment is ready
+                    // Clear the preferences and show empty detail
+                    preferencesHelper.clearAllPreferences();
 
-                // Update toolbar title
-                updateToolbarTitle(sheetMusic.getTitle());
-
-                // Update ViewModel's selected sheet
-                sheetViewModel.selectSheet(sheetId);
-            } else {
-                // Sheet not found (might have been deleted)
-                Log.w("MainActivity", "Last viewed sheet not found: " + sheetId);
-
-                // Clear the preferences and show empty detail
-                preferencesHelper.clearAllPreferences();
-
-                // Show default fragment
-                getSupportFragmentManager().beginTransaction()
-                        .add(R.id.content_container, new SheetDetailFragment())
-                        .commit();
+                    // Show default fragment
+                    getSupportFragmentManager().beginTransaction()
+                            .add(R.id.content_container, new SheetDetailFragment())
+                            .commit();
+                }
             }
-        });
+        };
+        live.observe(this, onceObserver);
     }
 
     private void initializeViews() {
@@ -1302,7 +1290,7 @@ public class MainActivity extends AppCompatActivity {
                 intent.putExtra(CropActivity.EXTRA_SHEET_ID, sheet.getId());
                 intent.putExtra(CropActivity.EXTRA_PAGE_NUMBER, fragment.getCurrentPage());
                 intent.putExtra(CropActivity.EXTRA_FILE_PATH, sheet.getFilePath());
-                startActivityForResult(intent, CROP_REQUEST_CODE);
+                cropActivityLauncher.launch(intent);
             } else {
                 Toast.makeText(this, "Sheet not found", Toast.LENGTH_SHORT).show();
             }
@@ -1319,16 +1307,6 @@ public class MainActivity extends AppCompatActivity {
         return 0;
     }
 
-    @Override
-    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-
-        if (requestCode == CROP_REQUEST_CODE && resultCode == RESULT_OK) {
-            // Refresh the current page display
-            refreshCurrentPage();
-            Toast.makeText(this, "Page updated successfully", Toast.LENGTH_SHORT).show();
-        }
-    }
 
     private void refreshCurrentPage() {
         SheetDetailFragment fragment = (SheetDetailFragment) getSupportFragmentManager()
@@ -1348,7 +1326,7 @@ public class MainActivity extends AppCompatActivity {
                         .commit();
 
                 // Restore the current page after a short delay
-                new Handler().postDelayed(() -> {
+                new Handler(getMainLooper()).postDelayed(() -> {
                     SheetDetailFragment restoredFragment = (SheetDetailFragment) getSupportFragmentManager()
                             .findFragmentById(R.id.content_container);
                     if (restoredFragment != null) {
@@ -1622,6 +1600,18 @@ public class MainActivity extends AppCompatActivity {
             }
     );
 
+    // Launcher for CropActivity results (replaces deprecated startActivityForResult)
+    private final ActivityResultLauncher<Intent> cropActivityLauncher = registerForActivityResult(
+            new ActivityResultContracts.StartActivityForResult(),
+            result -> {
+                if (result.getResultCode() == Activity.RESULT_OK) {
+                    // Refresh the current page display after cropping
+                    refreshCurrentPage();
+                    Toast.makeText(this, "Page updated successfully", Toast.LENGTH_SHORT).show();
+                }
+            }
+    );
+
     private void showNameInputDialog(Uri fileUri, String originalFileName) {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setTitle("Enter Sheet Name");
@@ -1651,16 +1641,10 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void processAddSheet(Uri fileUri, String suggestedName) {
-        // Show loading indicator
-        ProgressDialog progressDialog = new ProgressDialog(this);
-        progressDialog.setMessage("Adding sheet...");
-        progressDialog.setCancelable(false);
-        progressDialog.show();
+        // Provide lightweight user feedback without deprecated ProgressDialog
+        Toast.makeText(this, "Adding sheet...", Toast.LENGTH_SHORT).show();
 
         sheetViewModel.addSheet(fileUri, suggestedName, (sheetId, errorMessage) -> {
-            // Hide loading indicator
-            progressDialog.dismiss();
-
             if (sheetId != -1) {
                 Toast.makeText(MainActivity.this, "Sheet added successfully", Toast.LENGTH_SHORT).show();
             } else {

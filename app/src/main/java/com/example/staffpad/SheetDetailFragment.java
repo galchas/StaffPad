@@ -41,6 +41,7 @@ import android.content.Context;
 public class SheetDetailFragment extends Fragment {
     private static final String TAG = "SheetDetailFragment";
     private static final String ARG_SHEET_ID = "sheet_id";
+    private static final String ARG_INITIAL_PAGE = "initial_page";
     private long sheetId = -1;
     private SheetViewModel sheetViewModel;
     private PhotoView photoView;
@@ -74,11 +75,23 @@ public class SheetDetailFragment extends Fragment {
         return fragment;
     }
 
+    public static SheetDetailFragment newInstance(long sheetId, int initialPage) {
+        SheetDetailFragment fragment = new SheetDetailFragment();
+        Bundle args = new Bundle();
+        args.putLong(ARG_SHEET_ID, sheetId);
+        args.putInt(ARG_INITIAL_PAGE, initialPage);
+        fragment.setArguments(args);
+        return fragment;
+    }
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         if (getArguments() != null) {
             sheetId = getArguments().getLong(ARG_SHEET_ID, -1);
+            if (getArguments().containsKey(ARG_INITIAL_PAGE)) {
+                currentPage = getArguments().getInt(ARG_INITIAL_PAGE, currentPage);
+            }
         }
 
         // Initialize ViewModel
@@ -99,8 +112,17 @@ public class SheetDetailFragment extends Fragment {
         photoView = view.findViewById(R.id.photo_view);
 
         if (sheetId != -1) {
-            // Get the sheet using LiveData for proper lifecycle management
-            sheetViewModel.getSheetById(sheetId).observe(getViewLifecycleOwner(), this::displaySheet);
+            // Observe the sheet ONCE to avoid repeated re-renders when DB fields (like lastOpened) change
+            final androidx.lifecycle.LiveData<com.example.staffpad.database.SheetEntity> live = sheetViewModel.getSheetById(sheetId);
+            final androidx.lifecycle.Observer<com.example.staffpad.database.SheetEntity> onceObserver = new androidx.lifecycle.Observer<com.example.staffpad.database.SheetEntity>() {
+                @Override
+                public void onChanged(com.example.staffpad.database.SheetEntity sheet) {
+                    // Remove observer immediately to prevent loops
+                    live.removeObserver(this);
+                    displaySheet(sheet);
+                }
+            };
+            live.observe(getViewLifecycleOwner(), onceObserver);
         }
     }
     private void displaySheet(SheetEntity sheet) {
@@ -142,10 +164,13 @@ public class SheetDetailFragment extends Fragment {
 
                 boolean usePdfBox = shouldUsePdfBox(pdfFile);
                 if (usePdfBox) {
+                    PDDocument newDoc = null;
+                    PDFRenderer newRenderer = null;
+                    boolean swapped = false;
                     try {
                         // Load into locals first to avoid losing references on race conditions
-                        PDDocument newDoc = PDDocument.load(pdfFile, MemoryUsageSetting.setupTempFileOnly());
-                        PDFRenderer newRenderer = new PDFRenderer(newDoc);
+                        newDoc = PDDocument.load(pdfFile, MemoryUsageSetting.setupTempFileOnly());
+                        newRenderer = new PDFRenderer(newDoc);
                         // Atomically swap under lock and close any previous document
                         synchronized (renderLock) {
                             PDDocument oldDoc = document;
@@ -156,6 +181,7 @@ public class SheetDetailFragment extends Fragment {
                             if (oldDoc != null && oldDoc != newDoc) {
                                 try { oldDoc.close(); } catch (IOException ignore) {}
                             }
+                            swapped = true;
                         }
                     } catch (OutOfMemoryError oom) {
                         Log.e(TAG, "PDDocument.load OOM, switching to Android PdfRenderer only", oom);
@@ -169,6 +195,27 @@ public class SheetDetailFragment extends Fragment {
                             androidRendererOnly = true;
                         }
                         // Determine page count via Android PdfRenderer
+                        try {
+                            ParcelFileDescriptor fd = ParcelFileDescriptor.open(pdfFile, ParcelFileDescriptor.MODE_READ_ONLY);
+                            PdfRenderer pr = new PdfRenderer(fd);
+                            altPageCount = pr.getPageCount();
+                            pr.close();
+                            fd.close();
+                        } catch (Exception e) {
+                            Log.e(TAG, "Failed to get page count via Android PdfRenderer", e);
+                            altPageCount = -1;
+                        }
+                    } catch (Throwable t) {
+                        Log.e(TAG, "PDFBox load/render init failed; will fallback to Android PdfRenderer", t);
+                        // Ensure locals are closed if swap didn't happen
+                        if (!swapped) {
+                            try { if (newDoc != null) newDoc.close(); } catch (IOException ignore) {}
+                        }
+                        synchronized (renderLock) {
+                            document = null;
+                            renderer = null;
+                            androidRendererOnly = true;
+                        }
                         try {
                             ParcelFileDescriptor fd = ParcelFileDescriptor.open(pdfFile, ParcelFileDescriptor.MODE_READ_ONLY);
                             PdfRenderer pr = new PdfRenderer(fd);
@@ -234,10 +281,15 @@ public class SheetDetailFragment extends Fragment {
                     return;
                 }
 
+                // If fragment is no longer attached, don't proceed
+                if (!isAdded()) {
+                    return;
+                }
+
                 // Load and apply layers
                 loadAndApplyLayers(sheet.getId(), currentPage, baseBitmap);
 
-            } catch (IOException e) {
+            } catch (Exception e) {
                 Log.e(TAG, "Error loading PDF", e);
                 runOnUiThread(() -> showErrorImage("Error loading PDF: " + e.getMessage()));
             }
@@ -251,18 +303,32 @@ public class SheetDetailFragment extends Fragment {
             return;
         }
 
-        AppDatabase db = AppDatabase.getDatabase(requireContext().getApplicationContext());
+        // Ensure fragment is attached and view lifecycle owner is available
+        if (!isAdded()) {
+            return;
+        }
+        androidx.lifecycle.LifecycleOwner vlo = getViewLifecycleOwnerLiveData().getValue();
+        if (vlo == null) {
+            // View lifecycle owner not ready; skip to avoid crash
+            return;
+        }
+
+        Context appCtx = getActivity() != null ? getActivity().getApplicationContext() : null;
+        if (appCtx == null) {
+            return;
+        }
+        AppDatabase db = AppDatabase.getDatabase(appCtx);
 
         // Remove previous observer to avoid accumulation
         if (activeLayersLiveData != null) {
             try {
-                activeLayersLiveData.removeObservers(getViewLifecycleOwner());
+                activeLayersLiveData.removeObservers(vlo);
             } catch (Exception ignored) {}
         }
 
         // Get active layers for this page and observe once per page
         activeLayersLiveData = db.pageLayerDao().getActiveLayersForPage(sheetId, pageNumber);
-        activeLayersLiveData.observe(getViewLifecycleOwner(), layers -> {
+        activeLayersLiveData.observe(vlo, layers -> {
             if (layers == null || layers.isEmpty()) {
                 // No layers, just show base bitmap
                 displayBitmap(baseBitmap);
@@ -284,6 +350,9 @@ public class SheetDetailFragment extends Fragment {
 
     private void displayBitmap(Bitmap bitmap) {
         if (photoView != null && bitmap != null) {
+            if (photoView.getVisibility() != View.VISIBLE) {
+                photoView.setVisibility(View.VISIBLE);
+            }
             photoView.setImageBitmap(bitmap);
             photoView.setMaximumScale(5.0f);
 
@@ -295,6 +364,16 @@ public class SheetDetailFragment extends Fragment {
 
             // Setup page navigation
             setupPageNavigation();
+
+            // Persist the current view (sheet + page) immediately after first successful render
+            if (currentSheetId != -1) {
+                try {
+                    preferencesHelper.saveLastViewedPage(currentSheetId, currentPage);
+                    Log.d(TAG, "displayBitmap: Saved last viewed page " + currentPage + " for sheet " + currentSheetId);
+                } catch (Exception e) {
+                    Log.w(TAG, "displayBitmap: Failed to save last viewed page", e);
+                }
+            }
 
             Log.d(TAG, "Bitmap displayed with layers applied");
         }
@@ -565,6 +644,34 @@ public class SheetDetailFragment extends Fragment {
             }
             document = null;
             renderer = null;
+        }
+    }
+
+    private boolean attemptedAutoRefresh = false;
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        // Fail-safe: if no image is displayed yet, try a one-time refresh after a short delay
+        if (photoView != null && photoView.getDrawable() == null) {
+            photoView.postDelayed(() -> {
+                if (isAdded() && photoView != null && photoView.getDrawable() == null) {
+                    if (currentPdfFile != null) {
+                        if (!attemptedAutoRefresh) {
+                            attemptedAutoRefresh = true;
+                            Log.d(TAG, "Auto-refreshing page display onResume");
+                            refreshPage();
+                        }
+                    } else {
+                        // If PDF file isn't ready yet, try once to kick rendering via setCurrentPage
+                        if (!attemptedAutoRefresh) {
+                            attemptedAutoRefresh = true;
+                            Log.d(TAG, "Auto-refreshing via setCurrentPage onResume (no file yet)");
+                            setCurrentPage(currentPage);
+                        }
+                    }
+                }
+            }, 200);
         }
     }
 
