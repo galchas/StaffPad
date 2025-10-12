@@ -102,8 +102,8 @@ public class CropImageView extends View {
         float imageWidth = bitmap.getWidth();
         float imageHeight = bitmap.getHeight();
 
-        // Calculate scale to fit image in view with minimal margins for larger preview
-        float scale = Math.min(viewWidth / imageWidth, viewHeight / imageHeight) * 0.98f;
+        // Calculate scale to fit image in view exactly edge-to-edge
+        float scale = Math.min(viewWidth / imageWidth, viewHeight / imageHeight);
 
         float scaledWidth = imageWidth * scale;
         float scaledHeight = imageHeight * scale;

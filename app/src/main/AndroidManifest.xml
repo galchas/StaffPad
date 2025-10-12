@@ -32,7 +32,6 @@
         android:name=".CropActivity"
         android:configChanges="keyboardHidden|orientation|screenSize"
         android:exported="false"
-        android:screenOrientation="landscape"
         android:theme="@style/Theme.StaffPad" />
     </application>
 </manifest>

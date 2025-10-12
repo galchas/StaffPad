@@ -8,7 +8,7 @@ import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.ImageButton;
-import android.widget.SeekBar;
+import com.google.android.material.slider.Slider;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -39,9 +39,9 @@ public class CropActivity extends AppCompatActivity {
     private ImageButton resetButton;
     private Button applyButton;
     private Button cancelButton;
-    private SeekBar brightnessSeekBar;
-    private SeekBar contrastSeekBar;
-    private SeekBar rotationSeekBar;
+    private Slider brightnessSlider;
+    private Slider contrastSlider;
+    private Slider rotationSlider;
     private TextView brightnessLabel;
     private TextView contrastLabel;
     private TextView rotationLabel;
@@ -58,6 +58,7 @@ public class CropActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
         setContentView(R.layout.activity_crop);
 
         // Get extras
@@ -83,19 +84,17 @@ public class CropActivity extends AppCompatActivity {
         resetButton = findViewById(R.id.reset_button);
         applyButton = findViewById(R.id.apply_button);
         cancelButton = findViewById(R.id.cancel_button);
-        brightnessSeekBar = findViewById(R.id.brightness_seekbar);
-        contrastSeekBar = findViewById(R.id.contrast_seekbar);
-        rotationSeekBar = findViewById(R.id.rotation_seekbar);
+        brightnessSlider = findViewById(R.id.brightness_slider);
+        contrastSlider = findViewById(R.id.contrast_slider);
+        rotationSlider = findViewById(R.id.rotation_slider);
         brightnessLabel = findViewById(R.id.brightness_label);
         contrastLabel = findViewById(R.id.contrast_label);
         rotationLabel = findViewById(R.id.rotation_label);
 
-        // Setup seekbars
-        brightnessSeekBar.setMax(200); // -100 to 100
-        brightnessSeekBar.setProgress(100); // 0 in the middle
-
-        contrastSeekBar.setMax(150); // 0.5 to 2.0
-        contrastSeekBar.setProgress(50); // 1.0 in the middle
+        // Setup sliders initial values
+        brightnessSlider.setValue(0f); // -100..100
+        contrastSlider.setValue(1.0f); // 0.5..2.0
+        rotationSlider.setValue(0f); // -10..10
     }
 
     private void setupListeners() {
@@ -105,49 +104,23 @@ public class CropActivity extends AppCompatActivity {
         applyButton.setOnClickListener(v -> applyChanges());
         cancelButton.setOnClickListener(v -> finish());
 
-        // Fine rotation: map 0..200 to -10..+10 degrees
-        rotationSeekBar.setMax(200);
-        rotationSeekBar.setProgress(100); // center -> 0°
-        rotationSeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            @Override
-            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                float degrees = (progress - 100) / 100f * 10f; // -10..+10
-                currentRotation = degrees;
-                rotationLabel.setText(String.format("Align: %.1f°", degrees));
-                cropImageView.setRotation(currentRotation);
-            }
-            @Override public void onStartTrackingTouch(SeekBar seekBar) {}
-            @Override public void onStopTrackingTouch(SeekBar seekBar) {}
+        // Fine rotation: slider value is -10..+10 degrees
+        rotationSlider.addOnChangeListener((slider, value, fromUser) -> {
+            currentRotation = value;
+            rotationLabel.setText(String.format("Align: %.1f°", currentRotation));
+            cropImageView.setRotation(currentRotation);
         });
 
-        brightnessSeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            @Override
-            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                brightness = (progress - 100); // Convert to -100 to 100
-                brightnessLabel.setText(String.format("Brightness: %d", (int)brightness));
-                applyFilters();
-            }
-
-            @Override
-            public void onStartTrackingTouch(SeekBar seekBar) {}
-
-            @Override
-            public void onStopTrackingTouch(SeekBar seekBar) {}
+        brightnessSlider.addOnChangeListener((slider, value, fromUser) -> {
+            brightness = value; // already -100..100
+            brightnessLabel.setText(String.format("Brightness: %d", (int) brightness));
+            applyFilters();
         });
 
-        contrastSeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            @Override
-            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                contrast = 0.5f + (progress / 100f) * 1.5f; // Convert to 0.5 to 2.0
-                contrastLabel.setText(String.format("Contrast: %.2f", contrast));
-                applyFilters();
-            }
-
-            @Override
-            public void onStartTrackingTouch(SeekBar seekBar) {}
-
-            @Override
-            public void onStopTrackingTouch(SeekBar seekBar) {}
+        contrastSlider.addOnChangeListener((slider, value, fromUser) -> {
+            contrast = value; // already 0.5..2.0
+            contrastLabel.setText(String.format("Contrast: %.2f", contrast));
+            applyFilters();
         });
     }
 
@@ -204,10 +177,9 @@ public class CropActivity extends AppCompatActivity {
         if (currentRotation > 10f) currentRotation = 10f;
         if (currentRotation < -10f) currentRotation = -10f;
         cropImageView.setRotation(currentRotation);
-        // Sync UI seekbar and label if available
-        if (rotationSeekBar != null) {
-            int progress = (int) ((currentRotation / 10f) * 100f) + 100; // map back to 0..200
-            rotationSeekBar.setProgress(progress);
+        // Sync UI slider and label if available
+        if (rotationSlider != null) {
+            rotationSlider.setValue(currentRotation);
         }
         if (rotationLabel != null) {
             rotationLabel.setText(String.format("Align: %.1f°", currentRotation));
@@ -222,9 +194,9 @@ public class CropActivity extends AppCompatActivity {
 
         cropImageView.setRotation(0);
         cropImageView.resetCrop();
-        brightnessSeekBar.setProgress(100);
-        contrastSeekBar.setProgress(50);
-        if (rotationSeekBar != null) rotationSeekBar.setProgress(100);
+        if (brightnessSlider != null) brightnessSlider.setValue(0f);
+        if (contrastSlider != null) contrastSlider.setValue(1.0f);
+        if (rotationSlider != null) rotationSlider.setValue(0f);
         if (rotationLabel != null) rotationLabel.setText("Align: 0°");
 
         if (originalBitmap != null) {

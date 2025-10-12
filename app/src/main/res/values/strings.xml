@@ -53,4 +53,6 @@
     <string name="apply">Apply</string>
     <string name="add_layer">Add Layer</string>
     <string name="crop_amp_align_page"><![CDATA[Crop & Align Page]]></string>
+    <string name="rotate_right">Rotate Right</string>
+    <string name="reset">Reset</string>
 </resources>
