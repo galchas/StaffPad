@@ -55,4 +55,11 @@
     <string name="crop_amp_align_page"><![CDATA[Crop & Align Page]]></string>
     <string name="rotate_right">Rotate Right</string>
     <string name="reset">Reset</string>
+    <string name="exit_annotations">Exit annotations</string>
+    <string name="text_tool">Text tool</string>
+    <string name="clear_annotations">Clear annotations</string>
+    <string name="redo">Redo</string>
+    <string name="undo">Undo</string>
+    <string name="eraser">Eraser</string>
+    <string name="pen_settings">Pen settings</string>
 </resources>

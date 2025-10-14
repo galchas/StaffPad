@@ -21,9 +21,10 @@ import java.util.concurrent.Executors;
                 SheetLibraryCrossRef.class,
                 SheetTagCrossRef.class,
                 LibraryEntity.class,
-                PageLayerEntity.class
+                PageLayerEntity.class,
+                PageSettingsEntity.class
         },
-        version = 2,
+        version = 3,
         exportSchema = false
 )
 public abstract class AppDatabase extends RoomDatabase {
@@ -33,6 +34,7 @@ public abstract class AppDatabase extends RoomDatabase {
     public abstract TagDao tagDao();
     public abstract LibraryDao libraryDao();
     public abstract PageLayerDao pageLayerDao();
+    public abstract PageSettingsDao pageSettingsDao();
     private static volatile AppDatabase INSTANCE;
     private static final int NUMBER_OF_THREADS = 4;
     public static final ExecutorService databaseWriteExecutor =

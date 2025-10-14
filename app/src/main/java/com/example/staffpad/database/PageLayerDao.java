@@ -20,11 +20,14 @@ public interface PageLayerDao {
     @Delete
     void delete(PageLayerEntity layer);
 
-    @Query("SELECT * FROM page_layers WHERE sheet_id = :sheetId AND page_number = :pageNumber AND is_active = 1 ORDER BY order_index ASC, id ASC")
+    @Query("SELECT * FROM page_layers WHERE sheet_id = :sheetId AND page_number = :pageNumber AND is_active = 1 AND layer_type != 'CROP' ORDER BY order_index ASC, id ASC")
     LiveData<List<PageLayerEntity>> getActiveLayersForPage(long sheetId, int pageNumber);
 
-    @Query("SELECT * FROM page_layers WHERE sheet_id = :sheetId AND page_number = :pageNumber ORDER BY order_index ASC, id ASC")
+    @Query("SELECT * FROM page_layers WHERE sheet_id = :sheetId AND page_number = :pageNumber AND layer_type != 'CROP' ORDER BY order_index ASC, id ASC")
     LiveData<List<PageLayerEntity>> getAllLayersForPage(long sheetId, int pageNumber);
+
+    @Query("SELECT * FROM page_layers WHERE sheet_id = :sheetId AND page_number = :pageNumber AND is_active = 1 AND layer_type = 'ANNOTATION' ORDER BY order_index ASC, id ASC LIMIT 1")
+    PageLayerEntity getActiveAnnotationLayer(long sheetId, int pageNumber);
 
     @Query("SELECT COALESCE(MAX(order_index), -1) FROM page_layers WHERE sheet_id = :sheetId AND page_number = :pageNumber")
     int getMaxOrderIndex(long sheetId, int pageNumber);
@@ -34,4 +37,10 @@ public interface PageLayerDao {
 
     @Query("UPDATE page_layers SET is_active = :active WHERE id = :layerId")
     void setActive(long layerId, boolean active);
+
+    @Query("SELECT * FROM page_layers WHERE sheet_id = :sheetId AND page_number = :pageNumber AND layer_type = 'CROP' ORDER BY modified_at DESC, id DESC LIMIT 1")
+    PageLayerEntity getLatestCropLayerForPage(long sheetId, int pageNumber);
+
+    @Query("UPDATE page_layers SET is_active = 0 WHERE sheet_id = :sheetId AND page_number = :pageNumber AND layer_type = 'CROP' AND id != :keepId")
+    void deactivateOtherCropLayers(long sheetId, int pageNumber, long keepId);
 }

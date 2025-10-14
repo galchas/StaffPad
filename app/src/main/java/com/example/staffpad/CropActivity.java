@@ -18,6 +18,8 @@ import com.example.staffpad.views.CropImageView;
 import com.example.staffpad.database.AppDatabase;
 import com.example.staffpad.database.PageLayerDao;
 import com.example.staffpad.database.PageLayerEntity;
+import com.example.staffpad.database.PageSettingsDao;
+import com.example.staffpad.database.PageSettingsEntity;
 import com.tom_roush.pdfbox.pdmodel.PDDocument;
 import com.tom_roush.pdfbox.rendering.PDFRenderer;
 import android.os.ParcelFileDescriptor;
@@ -39,12 +41,16 @@ public class CropActivity extends AppCompatActivity {
     private ImageButton resetButton;
     private Button applyButton;
     private Button cancelButton;
+    private Button restoreButton;
     private Slider brightnessSlider;
     private Slider contrastSlider;
     private Slider rotationSlider;
     private TextView brightnessLabel;
     private TextView contrastLabel;
     private TextView rotationLabel;
+
+    private boolean userHasChanged = false;
+    private boolean suppressNextCropEvent = true;
 
     private long sheetId;
     private int pageNumber;
@@ -75,6 +81,8 @@ public class CropActivity extends AppCompatActivity {
         initializeViews();
         setupListeners();
         loadPage();
+        // Per UX (B): show original page with default controls; do not pre-apply saved settings.
+        // We will enable the Apply button only when the user makes changes.
     }
 
     private void initializeViews() {
@@ -90,6 +98,7 @@ public class CropActivity extends AppCompatActivity {
         brightnessLabel = findViewById(R.id.brightness_label);
         contrastLabel = findViewById(R.id.contrast_label);
         rotationLabel = findViewById(R.id.rotation_label);
+        restoreButton = findViewById(R.id.restore_button);
 
         // Setup sliders initial values
         brightnessSlider.setValue(0f); // -100..100
@@ -98,30 +107,69 @@ public class CropActivity extends AppCompatActivity {
     }
 
     private void setupListeners() {
-        rotateLeftButton.setOnClickListener(v -> rotateImage(-90));
-        rotateRightButton.setOnClickListener(v -> rotateImage(90));
-        resetButton.setOnClickListener(v -> resetImage());
+        applyButton.setEnabled(false);
+
+        rotateLeftButton.setOnClickListener(v -> {
+            rotateImage(-90);
+            markChanged();
+        });
+        rotateRightButton.setOnClickListener(v -> {
+            rotateImage(90);
+            markChanged();
+        });
+        resetButton.setOnClickListener(v -> {
+            resetImage();
+            // After reset to defaults, no changes pending
+            userHasChanged = false;
+            updateApplyEnabled();
+        });
         applyButton.setOnClickListener(v -> applyChanges());
         cancelButton.setOnClickListener(v -> finish());
+        if (restoreButton != null) {
+            restoreButton.setOnClickListener(v -> restoreLastSnapshot());
+        }
+
+        // Track crop rectangle changes from user drags
+        cropImageView.setOnCropChangeListener(newRect -> {
+            if (suppressNextCropEvent) {
+                suppressNextCropEvent = false;
+                return;
+            }
+            markChanged();
+        });
 
         // Fine rotation: slider value is -10..+10 degrees
         rotationSlider.addOnChangeListener((slider, value, fromUser) -> {
             currentRotation = value;
             rotationLabel.setText(String.format("Align: %.1f°", currentRotation));
             cropImageView.setRotation(currentRotation);
+            if (fromUser) markChanged();
         });
 
         brightnessSlider.addOnChangeListener((slider, value, fromUser) -> {
             brightness = value; // already -100..100
             brightnessLabel.setText(String.format("Brightness: %d", (int) brightness));
             applyFilters();
+            if (fromUser) markChanged();
         });
 
         contrastSlider.addOnChangeListener((slider, value, fromUser) -> {
             contrast = value; // already 0.5..2.0
             contrastLabel.setText(String.format("Contrast: %.2f", contrast));
             applyFilters();
+            if (fromUser) markChanged();
         });
+    }
+
+    private void markChanged() {
+        if (!userHasChanged) {
+            userHasChanged = true;
+            updateApplyEnabled();
+        }
+    }
+
+    private void updateApplyEnabled() {
+        if (applyButton != null) applyButton.setEnabled(userHasChanged);
     }
 
     private void loadPage() {
@@ -155,6 +203,34 @@ public class CropActivity extends AppCompatActivity {
                     if (originalBitmap != null) {
                         cropImageView.setImageBitmap(originalBitmap);
                         Log.d(TAG, "Page loaded successfully");
+                        // After the bitmap is set, optionally apply saved settings to the UI/preview
+                        AppDatabase adb = AppDatabase.getDatabase(getApplicationContext());
+                        AppDatabase.databaseWriteExecutor.execute(() -> {
+                            PageSettingsDao sdao = adb.pageSettingsDao();
+                            PageSettingsEntity settings = sdao.getByPage(sheetId, pageNumber);
+                            if (settings != null) {
+                                runOnUiThreadSafe(() -> {
+                                    // Prefill controls and preview to reflect current saved settings
+                                    currentRotation = settings.getRotation();
+                                    brightness = settings.getBrightness();
+                                    contrast = settings.getContrast();
+                                    rotationSlider.setValue(currentRotation);
+                                    rotationLabel.setText(String.format("Align: %.1f°", currentRotation));
+                                    cropImageView.setRotation(currentRotation);
+                                    brightnessSlider.setValue(brightness);
+                                    brightnessLabel.setText(String.format("Brightness: %d", (int) brightness));
+                                    contrastSlider.setValue(contrast);
+                                    contrastLabel.setText(String.format("Contrast: %.2f", contrast));
+                                    // Set crop rectangle if not full image
+                                    android.graphics.RectF nb = new android.graphics.RectF(
+                                            settings.getCropLeft(), settings.getCropTop(),
+                                            settings.getCropRight(), settings.getCropBottom());
+                                    if (!(Math.abs(nb.left) < 1e-3 && Math.abs(nb.top) < 1e-3 && Math.abs(nb.right - 1f) < 1e-3 && Math.abs(nb.bottom - 1f) < 1e-3)) {
+                                        cropImageView.setCropFromNormalized(nb);
+                                    }
+                                });
+                            }
+                        });
                     } else {
                         Toast.makeText(this, "Error loading page", Toast.LENGTH_SHORT).show();
                         finish();
@@ -200,6 +276,7 @@ public class CropActivity extends AppCompatActivity {
         if (rotationLabel != null) rotationLabel.setText("Align: 0°");
 
         if (originalBitmap != null) {
+            // Show original with no filters
             cropImageView.setImageBitmap(originalBitmap);
         }
 
@@ -253,7 +330,7 @@ public class CropActivity extends AppCompatActivity {
     }
 
     private void applyChanges() {
-        Toast.makeText(this, "Saving as new layer...", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, "Saving crop...", Toast.LENGTH_SHORT).show();
 
         new Thread(() -> {
             try {
@@ -265,35 +342,116 @@ public class CropActivity extends AppCompatActivity {
                 }
 
                 AppDatabase db = AppDatabase.getDatabase(getApplicationContext());
-                PageLayerDao dao = db.pageLayerDao();
+                PageSettingsDao sdao = db.pageSettingsDao();
+                PageSettingsEntity current = sdao.getByPage(sheetId, pageNumber);
 
-                // Determine next order index
-                int maxOrder = dao.getMaxOrderIndex(sheetId, pageNumber);
-                int nextOrder = maxOrder + 1;
+                // Snapshot previous settings into a hidden history layer (type 'CROP')
+                try {
+                    PageLayerDao ldao = db.pageLayerDao();
+                    PageLayerEntity snap = new PageLayerEntity(sheetId, pageNumber, "__crop_snapshot__", "CROP");
+                    if (current != null) {
+                        snap.setCropLeft(current.getCropLeft());
+                        snap.setCropTop(current.getCropTop());
+                        snap.setCropRight(current.getCropRight());
+                        snap.setCropBottom(current.getCropBottom());
+                        snap.setRotation(current.getRotation());
+                        snap.setBrightness(current.getBrightness());
+                        snap.setContrast(current.getContrast());
+                    } else {
+                        // Defaults (full page) snapshot
+                        snap.setCropLeft(0f);
+                        snap.setCropTop(0f);
+                        snap.setCropRight(1f);
+                        snap.setCropBottom(1f);
+                        snap.setRotation(0f);
+                        snap.setBrightness(0f);
+                        snap.setContrast(1f);
+                    }
+                    long snapId = ldao.insert(snap);
+                    // Keep only latest snapshot active
+                    ldao.deactivateOtherCropLayers(sheetId, pageNumber, snapId);
+                } catch (Throwable t) {
+                    Log.w(TAG, "Failed to snapshot previous crop settings", t);
+                }
 
-                // Create and populate layer entity
-                PageLayerEntity layer = new PageLayerEntity(sheetId, pageNumber, "Layer " + nextOrder, "CROP");
-                layer.setOrderIndex(nextOrder);
-                layer.setActive(true);
-                layer.setCropLeft(cropBounds.left);
-                layer.setCropTop(cropBounds.top);
-                layer.setCropRight(cropBounds.right);
-                layer.setCropBottom(cropBounds.bottom);
-                layer.setRotation(currentRotation);
-                layer.setBrightness(brightness);
-                layer.setContrast(contrast);
-                layer.setModifiedAt(System.currentTimeMillis());
-
-                dao.insert(layer);
+                // Write new settings (virtual layer)
+                PageSettingsEntity settings = current != null ? current : new PageSettingsEntity(sheetId, pageNumber);
+                settings.setCropLeft(cropBounds.left);
+                settings.setCropTop(cropBounds.top);
+                settings.setCropRight(cropBounds.right);
+                settings.setCropBottom(cropBounds.bottom);
+                settings.setRotation(currentRotation);
+                settings.setBrightness(brightness);
+                settings.setContrast(contrast);
+                settings.setModifiedAt(System.currentTimeMillis());
+                sdao.upsert(settings);
 
                 runOnUiThread(() -> {
-                    Toast.makeText(this, "Layer saved", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(this, "Crop saved", Toast.LENGTH_SHORT).show();
                     setResult(RESULT_OK);
                     finish();
                 });
 
             } catch (Exception e) {
-                Log.e(TAG, "Error saving layer", e);
+                Log.e(TAG, "Error saving settings", e);
+                runOnUiThread(() -> Toast.makeText(this, "Error: " + e.getMessage(), Toast.LENGTH_LONG).show());
+            }
+        }).start();
+    }
+
+    private void restoreLastSnapshot() {
+        Toast.makeText(this, "Restoring previous crop...", Toast.LENGTH_SHORT).show();
+        new Thread(() -> {
+            try {
+                AppDatabase db = AppDatabase.getDatabase(getApplicationContext());
+                PageLayerDao ldao = db.pageLayerDao();
+                PageLayerEntity last = ldao.getLatestCropLayerForPage(sheetId, pageNumber);
+                if (last == null) {
+                    runOnUiThread(() -> Toast.makeText(this, "No previous crop to restore", Toast.LENGTH_SHORT).show());
+                    return;
+                }
+
+                // Move current settings to history as well
+                try {
+                    PageSettingsDao sdao = db.pageSettingsDao();
+                    PageSettingsEntity current = sdao.getByPage(sheetId, pageNumber);
+                    if (current != null) {
+                        PageLayerEntity snap = new PageLayerEntity(sheetId, pageNumber, "__crop_snapshot__", "CROP");
+                        snap.setCropLeft(current.getCropLeft());
+                        snap.setCropTop(current.getCropTop());
+                        snap.setCropRight(current.getCropRight());
+                        snap.setCropBottom(current.getCropBottom());
+                        snap.setRotation(current.getRotation());
+                        snap.setBrightness(current.getBrightness());
+                        snap.setContrast(current.getContrast());
+                        long snapId = ldao.insert(snap);
+                        ldao.deactivateOtherCropLayers(sheetId, pageNumber, snapId);
+                    }
+                } catch (Throwable t) {
+                    Log.w(TAG, "Failed to snapshot current before restore", t);
+                }
+
+                // Apply snapshot back to virtual settings
+                PageSettingsDao sdao = db.pageSettingsDao();
+                PageSettingsEntity target = sdao.getByPage(sheetId, pageNumber);
+                if (target == null) target = new PageSettingsEntity(sheetId, pageNumber);
+                target.setCropLeft(last.getCropLeft());
+                target.setCropTop(last.getCropTop());
+                target.setCropRight(last.getCropRight());
+                target.setCropBottom(last.getCropBottom());
+                target.setRotation(last.getRotation());
+                target.setBrightness(last.getBrightness());
+                target.setContrast(last.getContrast());
+                target.setModifiedAt(System.currentTimeMillis());
+                sdao.upsert(target);
+
+                runOnUiThread(() -> {
+                    Toast.makeText(this, "Restored previous crop", Toast.LENGTH_SHORT).show();
+                    setResult(RESULT_OK);
+                    finish();
+                });
+            } catch (Exception e) {
+                Log.e(TAG, "Error restoring snapshot", e);
                 runOnUiThread(() -> Toast.makeText(this, "Error: " + e.getMessage(), Toast.LENGTH_LONG).show());
             }
         }).start();

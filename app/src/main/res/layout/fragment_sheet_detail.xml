@@ -3,10 +3,130 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     tools:context=".SheetDetailFragment">
+
     <com.github.chrisbanes.photoview.PhotoView
         android:id="@+id/photo_view"
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
+
+    <!-- Transparent overlay for annotations -->
+    <com.example.staffpad.views.AnnotationOverlayView
+        android:id="@+id/annotation_overlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone"/>
+
+    <!-- Draggable top toolbar for annotation tools -->
+    <LinearLayout
+        android:id="@+id/annotation_toolbar"
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:orientation="horizontal"
+        android:padding="8dp"
+        android:background="#8CFFFFFF"
+        android:gravity="center_vertical"
+        android:visibility="gone">
+        <ImageView
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:scaleType="center"
+            android:src="@drawable/round_menu_24" />
+        <ImageView
+            android:id="@+id/btn_tool_text"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:scaleType="center"
+            android:src="@drawable/ic_text_box"
+            android:contentDescription="@string/text_tool" />
+
+        <ImageView
+            android:id="@+id/btn_tool_pen"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/pen_settings"
+            android:scaleType="centerInside"
+            android:scaleX="0.5"
+            android:scaleY="0.5"
+            android:src="@drawable/pen_filled_writing_tool" />
+
+        <!-- Horizontal pen presets next to the pen button -->
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/pen_preset_list"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_weight="1"
+            android:layout_marginStart="8dp"
+            android:paddingTop="4dp"
+            android:paddingBottom="4dp"
+            android:overScrollMode="never"
+            android:visibility="visible"
+            tools:listitem="@android:layout/simple_list_item_1"/>
+
+        <ImageView
+            android:id="@+id/btn_tool_eraser"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_marginStart="12dp"
+            android:scaleType="center"
+            android:src="@drawable/outline_ink_eraser_24"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/eraser" />
+
+        <ImageView
+            android:id="@+id/btn_undo"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_marginStart="12dp"
+            android:src="@drawable/ic_undo"
+            android:scaleType="center"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/undo" />
+
+        <ImageView
+            android:id="@+id/btn_redo"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:src="@drawable/ic_redo"
+            android:scaleType="center"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/redo" />
+
+        <ImageView
+            android:id="@+id/btn_save_annotations"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_marginStart="12dp"
+            android:scaleType="center"
+            android:src="@drawable/outline_save_24"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="Save" />
+
+        <ImageView
+            android:id="@+id/btn_clear_annotations"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_marginStart="12dp"
+            android:scaleType="center"
+            android:src="@drawable/round_close_24"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/clear_annotations"/>
+
+        <ImageView
+            android:id="@+id/btn_exit_annotations"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/exit_annotations"
+            android:scaleType="center"
+            android:src="@drawable/outline_right_panel_close_24" />
+        <ImageView
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:scaleType="center"
+            android:src="@drawable/round_menu_24" />
+    </LinearLayout>
 
 </FrameLayout>

@@ -1,0 +1,337 @@
+package com.example.staffpad.views;
+
+import android.content.Context;
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
+import android.graphics.Color;
+import android.graphics.Paint;
+import android.graphics.Path;
+import android.text.TextPaint;
+import android.util.AttributeSet;
+import android.view.MotionEvent;
+import android.view.View;
+import android.widget.EditText;
+import android.content.res.Resources;
+
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Deque;
+import java.util.Iterator;
+import java.util.List;
+
+/**
+ * Simple transparent overlay view that supports freehand drawing, text boxes, eraser, and undo/redo.
+ * This is a minimal implementation to satisfy initial requirements.
+ */
+public class AnnotationOverlayView extends View {
+
+    public enum ToolMode { NONE, PEN, ERASER, TEXT }
+
+    public static abstract class AnnotationItem {
+        public abstract void draw(Canvas c);
+        public abstract boolean hitTest(float x, float y);
+    }
+
+    public static class Stroke extends AnnotationItem {
+        public final Path path = new Path();
+        public final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        public Stroke(int color, float width, int alpha) {
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeJoin(Paint.Join.ROUND);
+            paint.setStrokeCap(Paint.Cap.ROUND);
+            paint.setColor(color);
+            paint.setStrokeWidth(width);
+            paint.setAlpha(alpha);
+        }
+        @Override public void draw(Canvas c) { c.drawPath(path, paint); }
+        @Override public boolean hitTest(float x, float y) {
+            // Basic hit test using stroke width radius
+            // Not perfect but sufficient: check if any point on path is within radius (approx by region around point)
+            // Simplify: not implemented accurately; return false to fall back to layer erase via bounding box
+            return false;
+        }
+    }
+
+    public static class TextBox extends AnnotationItem {
+        public String text = "";
+        public float x, y;
+        public final TextPaint paint = new TextPaint(Paint.ANTI_ALIAS_FLAG);
+        public boolean bold = false;
+        public float textSizeSp = 16f;
+        public TextBox(float x, float y, int color, float textSizeSp, boolean bold) {
+            this.x = x; this.y = y; this.bold = bold; this.textSizeSp = textSizeSp;
+            paint.setColor(color);
+            paint.setTextSize(spToPx(textSizeSp));
+            paint.setFakeBoldText(bold);
+        }
+        @Override public void draw(Canvas c) {
+            if (text != null) {
+                c.drawText(text, x, y, paint);
+            }
+        }
+        @Override public boolean hitTest(float hx, float hy) {
+            if (text == null) return false;
+            float w = paint.measureText(text);
+            float h = paint.getTextSize();
+            return hx >= x && hx <= x + w && hy >= (y - h) && hy <= y;
+        }
+    }
+
+    private final List<AnnotationItem> items = new ArrayList<>();
+    private final Deque<AnnotationItem> undoStack = new ArrayDeque<>();
+    private final Deque<AnnotationItem> redoStack = new ArrayDeque<>();
+
+    private ToolMode mode = ToolMode.NONE;
+    private int penColor = Color.BLACK;
+    private int penAlpha = 255;
+    private float penWidthPx = 6f;
+
+    private Stroke currentStroke;
+    private TextBox currentTextBox;
+
+    // Text selection/drag/edit helpers
+    private TextBox selectedTextBox;
+    private TextBox draggingTextBox;
+    private float dragOffsetX;
+    private float dragOffsetY;
+    private float lastDownX;
+    private float lastDownY;
+    private boolean didMove;
+
+    // Paint for selection rectangle
+    private final Paint selectionPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+
+    public AnnotationOverlayView(Context context) {
+        super(context);
+        init();
+    }
+    public AnnotationOverlayView(Context context, AttributeSet attrs) {
+        super(context, attrs);
+        init();
+    }
+    public AnnotationOverlayView(Context context, AttributeSet attrs, int defStyleAttr) {
+        super(context, attrs, defStyleAttr);
+        init();
+    }
+
+    private void init() {
+        setWillNotDraw(false);
+        selectionPaint.setStyle(Paint.Style.STROKE);
+        selectionPaint.setStrokeWidth(3f);
+        selectionPaint.setColor(Color.BLUE);
+    }
+
+    public void setMode(ToolMode mode) {
+        this.mode = mode;
+        if (mode != ToolMode.TEXT) {
+            selectedTextBox = null;
+            draggingTextBox = null;
+        }
+        invalidate();
+    }
+    public ToolMode getMode() { return mode; }
+
+    public void setPen(int color, float widthPx, int alpha) {
+        this.penColor = color; this.penWidthPx = widthPx; this.penAlpha = alpha;
+    }
+
+    public void clear() {
+        items.clear();
+        undoStack.clear();
+        redoStack.clear();
+        invalidate();
+    }
+
+    public void undo() {
+        if (!items.isEmpty()) {
+            AnnotationItem item = items.remove(items.size()-1);
+            undoStack.push(item);
+            invalidate();
+        }
+    }
+
+    public void redo() {
+        if (!undoStack.isEmpty()) {
+            AnnotationItem item = undoStack.pop();
+            items.add(item);
+            invalidate();
+        }
+    }
+
+    public List<AnnotationItem> getItemsSnapshot() {
+        return new ArrayList<>(items);
+    }
+
+    public void addPenPreset(int color, float widthPx, int alpha) {
+        setPen(color, widthPx, alpha);
+        setMode(ToolMode.PEN);
+    }
+
+    public Bitmap exportToBitmap(int width, int height) {
+        Bitmap bmp = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+        Canvas c = new Canvas(bmp);
+        // Draw only persistent annotation content (strokes, text). Do not include transient UI like selection rectangles.
+        for (AnnotationItem it : items) {
+            it.draw(c);
+        }
+        if (currentStroke != null) currentStroke.draw(c);
+        if (currentTextBox != null) currentTextBox.draw(c);
+        return bmp;
+    }
+
+    @Override
+    protected void onDraw(Canvas canvas) {
+        super.onDraw(canvas);
+        for (AnnotationItem it : items) {
+            it.draw(canvas);
+        }
+        if (currentStroke != null) currentStroke.draw(canvas);
+        if (currentTextBox != null) currentTextBox.draw(canvas);
+
+        // Draw selection rectangle around selected text when in TEXT mode
+        if (mode == ToolMode.TEXT && selectedTextBox != null && selectedTextBox.text != null) {
+            float w = selectedTextBox.paint.measureText(selectedTextBox.text);
+            float h = selectedTextBox.paint.getTextSize();
+            float left = selectedTextBox.x;
+            float top = selectedTextBox.y - h;
+            float right = selectedTextBox.x + w;
+            float bottom = selectedTextBox.y;
+            // Slight padding
+            float pad = 6f;
+            canvas.drawRect(left - pad, top - pad, right + pad, bottom + pad, selectionPaint);
+        }
+    }
+
+    @Override
+    public boolean onTouchEvent(MotionEvent event) {
+        float x = event.getX();
+        float y = event.getY();
+        switch (mode) {
+            case PEN:
+                handlePenTouch(event, x, y);
+                return true;
+            case ERASER:
+                if (event.getAction() == MotionEvent.ACTION_UP) {
+                    eraseAt(x, y);
+                }
+                return true;
+            case TEXT:
+                return handleTextTouch(event, x, y);
+            default:
+                return false;
+        }
+    }
+
+    private void handlePenTouch(MotionEvent event, float x, float y) {
+        if (event.getAction() == MotionEvent.ACTION_DOWN) {
+            currentStroke = new Stroke(penColor, penWidthPx, penAlpha);
+            currentStroke.path.moveTo(x, y);
+            redoStack.clear();
+        } else if (event.getAction() == MotionEvent.ACTION_MOVE) {
+            if (currentStroke != null) {
+                currentStroke.path.lineTo(x, y);
+            }
+        } else if (event.getAction() == MotionEvent.ACTION_UP || event.getAction() == MotionEvent.ACTION_CANCEL) {
+            if (currentStroke != null) {
+                currentStroke.path.lineTo(x, y);
+                items.add(currentStroke);
+                currentStroke = null;
+            }
+        }
+        invalidate();
+    }
+
+    private void eraseAt(float x, float y) {
+        // Remove the last item under the point
+        for (int i = items.size()-1; i >= 0; i--) {
+            if (items.get(i).hitTest(x, y)) {
+                undoStack.clear();
+                redoStack.clear();
+                items.remove(i);
+                invalidate();
+                return;
+            }
+        }
+        // As a fallback, remove last item if nothing hit (simple behavior)
+        if (!items.isEmpty()) {
+            items.remove(items.size()-1);
+            invalidate();
+        }
+    }
+
+    private void startTextBox(float x, float y) {
+        currentTextBox = new TextBox(x, y, Color.BLACK, 16f, false);
+        selectedTextBox = currentTextBox;
+        // For minimal version, show a simple editable text via callback; consumer can set text later
+        if (onRequestEditTextListener != null) {
+            onRequestEditTextListener.onRequestEdit(currentTextBox);
+        }
+        // Add immediately (text may be empty until edited)
+        items.add(currentTextBox);
+        currentTextBox = null;
+        invalidate();
+    }
+
+    private boolean handleTextTouch(MotionEvent event, float x, float y) {
+        switch (event.getAction()) {
+            case MotionEvent.ACTION_DOWN:
+                draggingTextBox = findTopmostTextBoxAt(x, y);
+                selectedTextBox = draggingTextBox; // highlight the one we're about to move/edit
+                lastDownX = x;
+                lastDownY = y;
+                didMove = false;
+                if (draggingTextBox != null) {
+                    dragOffsetX = x - draggingTextBox.x;
+                    dragOffsetY = y - draggingTextBox.y;
+                }
+                invalidate();
+                return true;
+            case MotionEvent.ACTION_MOVE:
+                if (draggingTextBox != null) {
+                    float newX = x - dragOffsetX;
+                    float newY = y - dragOffsetY;
+                    draggingTextBox.x = newX;
+                    draggingTextBox.y = newY;
+                    didMove = true;
+                    invalidate();
+                }
+                return true;
+            case MotionEvent.ACTION_UP:
+                if (draggingTextBox != null) {
+                    if (!didMove && onRequestEditTextListener != null) {
+                        onRequestEditTextListener.onRequestEdit(draggingTextBox);
+                    }
+                    draggingTextBox = null;
+                    didMove = false;
+                    invalidate();
+                } else {
+                    // No existing box tapped; create a new one at this location
+                    startTextBox(x, y);
+                }
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    private TextBox findTopmostTextBoxAt(float x, float y) {
+        for (int i = items.size() - 1; i >= 0; i--) {
+            AnnotationItem it = items.get(i);
+            if (it instanceof TextBox) {
+                TextBox tb = (TextBox) it;
+                if (tb.hitTest(x, y)) return tb;
+            }
+        }
+        return null;
+    }
+
+    public interface OnRequestEditTextListener {
+        void onRequestEdit(TextBox textBox);
+    }
+    private OnRequestEditTextListener onRequestEditTextListener;
+    public void setOnRequestEditTextListener(OnRequestEditTextListener l) { this.onRequestEditTextListener = l; }
+
+    private static float spToPx(float sp) {
+        return sp * (Resources.getSystem().getDisplayMetrics().scaledDensity);
+    }
+}

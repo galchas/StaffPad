@@ -35,6 +35,14 @@ public class CropImageView extends View {
     private float lastTouchY;
     private float rotation = 0f;
 
+    public interface OnCropChangeListener {
+        void onCropChanged(RectF newCropRect);
+    }
+    private OnCropChangeListener cropChangeListener;
+    public void setOnCropChangeListener(OnCropChangeListener listener) {
+        this.cropChangeListener = listener;
+    }
+
     public CropImageView(Context context) {
         super(context);
         init();
@@ -90,6 +98,7 @@ public class CropImageView extends View {
                     imageBounds.right - padding,
                     imageBounds.bottom - padding
             );
+            if (cropChangeListener != null) cropChangeListener.onCropChanged(cropRect);
             invalidate();
         }
     }
@@ -327,6 +336,7 @@ public class CropImageView extends View {
                 newRect.left >= imageBounds.left && newRect.right <= imageBounds.right &&
                 newRect.top >= imageBounds.top && newRect.bottom <= imageBounds.bottom) {
             cropRect.set(newRect);
+            if (cropChangeListener != null) cropChangeListener.onCropChanged(cropRect);
         }
     }
 
@@ -364,5 +374,29 @@ public class CropImageView extends View {
         float bottom = (cropRect.bottom - imageBounds.top) * scaleY / bitmap.getHeight();
 
         return new RectF(left, top, right, bottom);
+    }
+
+    public void setCropFromNormalized(RectF normalizedBounds) {
+        if (bitmap == null || normalizedBounds == null) return;
+        // normalized bounds are 0..1 of original bitmap size
+        // We must map them into view space using imageBounds similar to getCropBounds inverse
+        float scaleX = imageBounds.width() / bitmap.getWidth();
+        float scaleY = imageBounds.height() / bitmap.getHeight();
+
+        float left = imageBounds.left + normalizedBounds.left * bitmap.getWidth() * scaleX;
+        float top = imageBounds.top + normalizedBounds.top * bitmap.getHeight() * scaleY;
+        float right = imageBounds.left + normalizedBounds.right * bitmap.getWidth() * scaleX;
+        float bottom = imageBounds.top + normalizedBounds.bottom * bitmap.getHeight() * scaleY;
+
+        RectF mapped = new RectF(left, top, right, bottom);
+        // Ensure within image bounds
+        mapped.left = Math.max(imageBounds.left, Math.min(mapped.left, imageBounds.right));
+        mapped.right = Math.max(imageBounds.left, Math.min(mapped.right, imageBounds.right));
+        mapped.top = Math.max(imageBounds.top, Math.min(mapped.top, imageBounds.bottom));
+        mapped.bottom = Math.max(imageBounds.top, Math.min(mapped.bottom, imageBounds.bottom));
+        if (mapped.width() >= 50 && mapped.height() >= 50) {
+            cropRect.set(mapped);
+            invalidate();
+        }
     }
 }

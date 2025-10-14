@@ -1171,7 +1171,17 @@ public class MainActivity extends AppCompatActivity {
                     launchCropActivity();
                     break;
                 case "Annotate":
-                    Toast.makeText(this, "Annotation feature coming soon", Toast.LENGTH_SHORT).show();
+                    try {
+                        androidx.fragment.app.Fragment f = getSupportFragmentManager().findFragmentById(R.id.content_container);
+                        if (f instanceof SheetDetailFragment) {
+                            ((SheetDetailFragment) f).enterAnnotationMode();
+                        } else {
+                            Toast.makeText(this, "Open a sheet to annotate", Toast.LENGTH_SHORT).show();
+                        }
+                    } catch (Throwable t) {
+                        Toast.makeText(this, "Unable to start annotation", Toast.LENGTH_SHORT).show();
+                        Log.e("MainActivity", "Failed to enter annotation mode", t);
+                    }
                     break;
                 case "Rearrange":
                     Toast.makeText(this, "Rearrange pages coming soon", Toast.LENGTH_SHORT).show();
