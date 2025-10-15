@@ -12,6 +12,8 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.widget.EditText;
 import android.content.res.Resources;
+import android.graphics.PorterDuff;
+import android.graphics.PorterDuffXfermode;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -35,6 +37,8 @@ public class AnnotationOverlayView extends View {
     public static class Stroke extends AnnotationItem {
         public final Path path = new Path();
         public final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        // Sampled points for serialization/history
+        public final java.util.List<float[]> points = new java.util.ArrayList<>();
         public Stroke(int color, float width, int alpha) {
             paint.setStyle(Paint.Style.STROKE);
             paint.setStrokeJoin(Paint.Join.ROUND);
@@ -43,13 +47,43 @@ public class AnnotationOverlayView extends View {
             paint.setStrokeWidth(width);
             paint.setAlpha(alpha);
         }
+        public void addPoint(float x, float y, boolean moveTo) {
+            if (moveTo) {
+                path.moveTo(x, y);
+            } else {
+                path.lineTo(x, y);
+            }
+            points.add(new float[]{x, y});
+        }
         @Override public void draw(Canvas c) { c.drawPath(path, paint); }
         @Override public boolean hitTest(float x, float y) {
-            // Basic hit test using stroke width radius
-            // Not perfect but sufficient: check if any point on path is within radius (approx by region around point)
-            // Simplify: not implemented accurately; return false to fall back to layer erase via bounding box
+            // Basic hit test: not implemented for vector hit; return false
             return false;
         }
+    }
+
+    public static class EraseStroke extends AnnotationItem {
+        public final Path path = new Path();
+        public final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        // Sampled points for serialization/history
+        public final java.util.List<float[]> points = new java.util.ArrayList<>();
+        public EraseStroke(float widthPx) {
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeJoin(Paint.Join.ROUND);
+            paint.setStrokeCap(Paint.Cap.ROUND);
+            paint.setStrokeWidth(widthPx);
+            paint.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.CLEAR));
+        }
+        public void addPoint(float x, float y, boolean moveTo) {
+            if (moveTo) {
+                path.moveTo(x, y);
+            } else {
+                path.lineTo(x, y);
+            }
+            points.add(new float[]{x, y});
+        }
+        @Override public void draw(Canvas c) { c.drawPath(path, paint); }
+        @Override public boolean hitTest(float x, float y) { return false; }
     }
 
     public static class TextBox extends AnnotationItem {
@@ -85,8 +119,10 @@ public class AnnotationOverlayView extends View {
     private int penColor = Color.BLACK;
     private int penAlpha = 255;
     private float penWidthPx = 6f;
+    private float eraserWidthPx = 20f;
 
     private Stroke currentStroke;
+    private EraseStroke currentErase;
     private TextBox currentTextBox;
 
     // Text selection/drag/edit helpers
@@ -116,6 +152,8 @@ public class AnnotationOverlayView extends View {
 
     private void init() {
         setWillNotDraw(false);
+        // Use software layer so CLEAR xfermode works reliably
+        setLayerType(LAYER_TYPE_SOFTWARE, null);
         selectionPaint.setStyle(Paint.Style.STROKE);
         selectionPaint.setStrokeWidth(3f);
         selectionPaint.setColor(Color.BLUE);
@@ -134,6 +172,8 @@ public class AnnotationOverlayView extends View {
     public void setPen(int color, float widthPx, int alpha) {
         this.penColor = color; this.penWidthPx = widthPx; this.penAlpha = alpha;
     }
+    public void setEraserWidth(float widthPx) { this.eraserWidthPx = Math.max(1f, widthPx); }
+    public float getEraserWidth() { return this.eraserWidthPx; }
 
     public void clear() {
         items.clear();
@@ -175,6 +215,7 @@ public class AnnotationOverlayView extends View {
             it.draw(c);
         }
         if (currentStroke != null) currentStroke.draw(c);
+        if (currentErase != null) currentErase.draw(c);
         if (currentTextBox != null) currentTextBox.draw(c);
         return bmp;
     }
@@ -186,6 +227,7 @@ public class AnnotationOverlayView extends View {
             it.draw(canvas);
         }
         if (currentStroke != null) currentStroke.draw(canvas);
+        if (currentErase != null) currentErase.draw(canvas);
         if (currentTextBox != null) currentTextBox.draw(canvas);
 
         // Draw selection rectangle around selected text when in TEXT mode
@@ -211,9 +253,7 @@ public class AnnotationOverlayView extends View {
                 handlePenTouch(event, x, y);
                 return true;
             case ERASER:
-                if (event.getAction() == MotionEvent.ACTION_UP) {
-                    eraseAt(x, y);
-                }
+                handleEraserTouch(event, x, y);
                 return true;
             case TEXT:
                 return handleTextTouch(event, x, y);
@@ -225,15 +265,15 @@ public class AnnotationOverlayView extends View {
     private void handlePenTouch(MotionEvent event, float x, float y) {
         if (event.getAction() == MotionEvent.ACTION_DOWN) {
             currentStroke = new Stroke(penColor, penWidthPx, penAlpha);
-            currentStroke.path.moveTo(x, y);
+            currentStroke.addPoint(x, y, true);
             redoStack.clear();
         } else if (event.getAction() == MotionEvent.ACTION_MOVE) {
             if (currentStroke != null) {
-                currentStroke.path.lineTo(x, y);
+                currentStroke.addPoint(x, y, false);
             }
         } else if (event.getAction() == MotionEvent.ACTION_UP || event.getAction() == MotionEvent.ACTION_CANCEL) {
             if (currentStroke != null) {
-                currentStroke.path.lineTo(x, y);
+                currentStroke.addPoint(x, y, false);
                 items.add(currentStroke);
                 currentStroke = null;
             }
@@ -241,22 +281,23 @@ public class AnnotationOverlayView extends View {
         invalidate();
     }
 
-    private void eraseAt(float x, float y) {
-        // Remove the last item under the point
-        for (int i = items.size()-1; i >= 0; i--) {
-            if (items.get(i).hitTest(x, y)) {
-                undoStack.clear();
-                redoStack.clear();
-                items.remove(i);
-                invalidate();
-                return;
+    private void handleEraserTouch(MotionEvent event, float x, float y) {
+        if (event.getAction() == MotionEvent.ACTION_DOWN) {
+            currentErase = new EraseStroke(eraserWidthPx);
+            currentErase.addPoint(x, y, true);
+            redoStack.clear();
+        } else if (event.getAction() == MotionEvent.ACTION_MOVE) {
+            if (currentErase != null) {
+                currentErase.addPoint(x, y, false);
+            }
+        } else if (event.getAction() == MotionEvent.ACTION_UP || event.getAction() == MotionEvent.ACTION_CANCEL) {
+            if (currentErase != null) {
+                currentErase.addPoint(x, y, false);
+                items.add(currentErase);
+                currentErase = null;
             }
         }
-        // As a fallback, remove last item if nothing hit (simple behavior)
-        if (!items.isEmpty()) {
-            items.remove(items.size()-1);
-            invalidate();
-        }
+        invalidate();
     }
 
     private void startTextBox(float x, float y) {
@@ -330,6 +371,23 @@ public class AnnotationOverlayView extends View {
     }
     private OnRequestEditTextListener onRequestEditTextListener;
     public void setOnRequestEditTextListener(OnRequestEditTextListener l) { this.onRequestEditTextListener = l; }
+
+    public void setItemsFromHistory(List<AnnotationItem> history) {
+        items.clear();
+        undoStack.clear();
+        redoStack.clear();
+        if (history != null) {
+            int start = Math.max(0, history.size() - 20);
+            for (int i = start; i < history.size(); i++) {
+                AnnotationItem it = history.get(i);
+                // Defensive: only accept known types
+                if (it instanceof Stroke || it instanceof EraseStroke || it instanceof TextBox) {
+                    items.add(it);
+                }
+            }
+        }
+        invalidate();
+    }
 
     private static float spToPx(float sp) {
         return sp * (Resources.getSystem().getDisplayMetrics().scaledDensity);

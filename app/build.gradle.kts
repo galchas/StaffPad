@@ -40,7 +40,6 @@ dependencies {
     testImplementation(libs.junit)
     androidTestImplementation(libs.ext.junit)
     androidTestImplementation(libs.espresso.core)
-
     // Room components
     implementation(libs.room.runtime)
     annotationProcessor(libs.room.compiler)
@@ -62,8 +61,7 @@ dependencies {
 
     implementation(libs.pdfbox.android)
     implementation(libs.photoview)
-
-
+    implementation(libs.colorpickerview)
 
 
 

@@ -1,21 +1,20 @@
 [versions]
 agp = "8.13.0"
-constraintlayoutVersion = "2.1.4"
+colorpickerview = "2.3.0"
 junit = "4.13.2"
-junitVersion = "1.2.1"
-espressoCore = "3.6.1"
-appcompat = "1.7.0"
-material = "1.12.0"
+junitVersion = "1.3.0"
+espressoCore = "3.7.0"
+appcompat = "1.7.1"
+material = "1.13.0"
 constraintlayout = "2.2.1"
 constraintlayoutCore = "1.1.1"
-materialVersion = "1.11.0"
-navVersion = "2.8.9"
+navVersion = "2.9.5"
 pdfboxAndroid = "2.0.27.0"
 photoview = "2.3.0"
-roomVersion = "2.6.1"
+roomVersion = "2.8.2"
 
 [libraries]
-constraintlayout-v214 = { module = "androidx.constraintlayout:constraintlayout", version.ref = "constraintlayoutVersion" }
+colorpickerview = { module = "com.github.skydoves:colorpickerview", version.ref = "colorpickerview" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 ext-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }
 espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }
@@ -23,7 +22,6 @@ appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "a
 material = { group = "com.google.android.material", name = "material", version.ref = "material" }
 constraintlayout = { group = "androidx.constraintlayout", name = "constraintlayout", version.ref = "constraintlayout" }
 constraintlayout-core = { group = "androidx.constraintlayout", name = "constraintlayout-core", version.ref = "constraintlayoutCore" }
-material-v1110 = { module = "com.google.android.material:material", version.ref = "materialVersion" }
 navigation-dynamic-features-fragment = { module = "androidx.navigation:navigation-dynamic-features-fragment", version.ref = "navVersion" }
 navigation-fragment = { module = "androidx.navigation:navigation-fragment", version.ref = "navVersion" }
 navigation-testing = { module = "androidx.navigation:navigation-testing", version.ref = "navVersion" }
@@ -34,7 +32,6 @@ room-compiler = { module = "androidx.room:room-compiler", version.ref = "roomVer
 room-ktx = { module = "androidx.room:room-ktx", version.ref = "roomVersion" }
 room-runtime = { module = "androidx.room:room-runtime", version.ref = "roomVersion" }
 room-testing = { module = "androidx.room:room-testing", version.ref = "roomVersion" }
-
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 

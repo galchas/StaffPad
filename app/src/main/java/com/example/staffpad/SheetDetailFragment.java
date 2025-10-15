@@ -250,9 +250,9 @@ public class SheetDetailFragment extends Fragment {
                 container.addView(preview, new android.widget.LinearLayout.LayoutParams(
                         android.view.ViewGroup.LayoutParams.MATCH_PARENT, pvH));
 
-                // Width slider
+                // Width slider (increased max)
                 final android.widget.SeekBar widthSeek = new android.widget.SeekBar(requireContext());
-                widthSeek.setMax(30);
+                widthSeek.setMax(80);
                 widthSeek.setProgress(6);
                 widthSeek.setOnSeekBarChangeListener(new android.widget.SeekBar.OnSeekBarChangeListener() {
                     @Override public void onProgressChanged(android.widget.SeekBar seekBar, int progress, boolean fromUser) {
@@ -265,72 +265,118 @@ public class SheetDetailFragment extends Fragment {
                 });
                 container.addView(widthSeek);
 
-                // Color palette (grid)
-                final int[] colors = new int[]{
-                        android.graphics.Color.BLACK,
-                        0xFF444444,
-                        android.graphics.Color.DKGRAY,
-                        android.graphics.Color.GRAY,
-                        android.graphics.Color.LTGRAY,
-                        android.graphics.Color.WHITE,
-                        android.graphics.Color.RED,
-                        0xFFFF5722, // deep orange
-                        android.graphics.Color.MAGENTA,
-                        android.graphics.Color.BLUE,
-                        0xFF3F51B5, // indigo
-                        android.graphics.Color.CYAN,
-                        android.graphics.Color.GREEN,
-                        0xFF4CAF50, // green variant
-                        android.graphics.Color.YELLOW,
-                        0xFFFFC107 // amber
-                };
-                final android.widget.GridLayout grid = new android.widget.GridLayout(requireContext());
-                grid.setColumnCount(6);
-                int sw = (int)(36 * getResources().getDisplayMetrics().density);
-                int sm = (int)(6 * getResources().getDisplayMetrics().density);
-
-                final android.view.View[] selectedHolder = new android.view.View[1];
-
-                for (int col : colors) {
-                    android.view.View swatch = new android.view.View(requireContext());
-                    android.widget.GridLayout.LayoutParams lp = new android.widget.GridLayout.LayoutParams();
-                    lp.width = sw; lp.height = sw; lp.setMargins(sm, sm, sm, sm);
-                    swatch.setLayoutParams(lp);
-                    swatch.setBackgroundColor(col);
-                    swatch.setOnClickListener(v2 -> {
-                        previewPaint.setColor(col);
+                // Opacity slider for pen alpha (0-100%)
+                final android.widget.TextView alphaLabel = new android.widget.TextView(requireContext());
+                alphaLabel.setText("Opacity");
+                container.addView(alphaLabel);
+                final android.widget.SeekBar alphaSeek = new android.widget.SeekBar(requireContext());
+                alphaSeek.setMax(100);
+                alphaSeek.setProgress(100);
+                alphaSeek.setOnSeekBarChangeListener(new android.widget.SeekBar.OnSeekBarChangeListener() {
+                    @Override public void onProgressChanged(android.widget.SeekBar seekBar, int progress, boolean fromUser) {
+                        int a = (int) Math.round(progress * 2.55);
+                        previewPaint.setAlpha(a);
                         preview.invalidate();
-                        if (selectedHolder[0] != null) selectedHolder[0].setForeground(null);
-                        android.graphics.drawable.GradientDrawable border = new android.graphics.drawable.GradientDrawable();
-                        border.setColor(0x00000000);
-                        border.setStroke((int)(2 * getResources().getDisplayMetrics().density), 0xFF0099FF);
-                        v2.setForeground(border);
-                        selectedHolder[0] = v2;
-                    });
-                    grid.addView(swatch);
-                }
-                container.addView(grid);
+                    }
+                    @Override public void onStartTrackingTouch(android.widget.SeekBar seekBar) {}
+                    @Override public void onStopTrackingTouch(android.widget.SeekBar seekBar) {}
+                });
+                container.addView(alphaSeek);
+
+                // Color picker view for pen color
+                final com.skydoves.colorpickerview.ColorPickerView colorPicker = new com.skydoves.colorpickerview.ColorPickerView.Builder(requireContext()).build();
+                // Use the library's default HSV palette per official docs (no explicit call needed)
+                colorPicker.setInitialColor(previewPaint.getColor());
+                colorPicker.setColorListener((com.skydoves.colorpickerview.listeners.ColorEnvelopeListener) (envelope, fromUser) -> {
+                    previewPaint.setColor(envelope.getColor());
+                    preview.invalidate();
+                });
+                int cpH = (int)(220 * getResources().getDisplayMetrics().density);
+                container.addView(colorPicker, new android.widget.LinearLayout.LayoutParams(
+                        android.view.ViewGroup.LayoutParams.MATCH_PARENT, cpH));
 
                 b.setView(container);
                 b.setNegativeButton("Cancel", null);
                 b.setPositiveButton("Use", (d, wbtn) -> {
                     int color = previewPaint.getColor();
                     float width = Math.max(1, widthSeek.getProgress());
-                    overlay.setPen(color, width, 255);
+                    int alpha = (int) Math.round(alphaSeek.getProgress() * 2.55);
+                    overlay.setPen(color, width, alpha);
                     overlay.setMode(com.example.staffpad.views.AnnotationOverlayView.ToolMode.PEN);
                 });
                 b.setNeutralButton("Save as preset", (d, wbtn) -> {
                     int color = previewPaint.getColor();
                     float width = Math.max(1, widthSeek.getProgress());
-                    PenPreset newPreset = new PenPreset("Custom", color, width, 255);
+                    int alpha = (int) Math.round(alphaSeek.getProgress() * 2.55);
+                    PenPreset newPreset = new PenPreset("Custom", color, width, alpha);
                     penPresets.add(0, newPreset);
                     savePenPresetsToPrefs();
                     if (penPresetAdapter != null) penPresetAdapter.notifyItemInserted(0);
                     if (penPresetList != null) penPresetList.scrollToPosition(0);
+                    // Immediately use this pen configuration after saving
+                    if (annotationOverlay != null) {
+                        annotationOverlay.setPen(color, width, alpha);
+                        annotationOverlay.setMode(com.example.staffpad.views.AnnotationOverlayView.ToolMode.PEN);
+                    }
                 });
                 b.show();
             });
             btnEraser.setOnClickListener(v -> overlay.setMode(com.example.staffpad.views.AnnotationOverlayView.ToolMode.ERASER));
+            btnEraser.setOnLongClickListener(v -> {
+                // Show eraser width preview dialog
+                android.app.AlertDialog.Builder b = new android.app.AlertDialog.Builder(requireContext());
+                b.setTitle("Eraser Settings");
+                final android.widget.LinearLayout container = new android.widget.LinearLayout(requireContext());
+                container.setOrientation(android.widget.LinearLayout.VERTICAL);
+                int pad = (int)(12 * getResources().getDisplayMetrics().density);
+                container.setPadding(pad, pad, pad, pad);
+
+                final android.graphics.Paint previewPaint = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+                previewPaint.setStyle(android.graphics.Paint.Style.STROKE);
+                previewPaint.setStrokeCap(android.graphics.Paint.Cap.ROUND);
+                previewPaint.setColor(0xFFCCCCCC);
+                previewPaint.setStrokeWidth(Math.max(1f, overlay.getEraserWidth()));
+
+                final android.view.View preview = new android.view.View(requireContext()) {
+                    @Override protected void onDraw(android.graphics.Canvas c) {
+                        super.onDraw(c);
+                        int w = getWidth();
+                        int h = getHeight();
+                        c.drawColor(0xFFEFEFEF);
+                        float cx = w/2f;
+                        float cy = h/2f;
+                        // draw a circle representing eraser size
+                        c.drawCircle(cx, cy, previewPaint.getStrokeWidth()/2f, previewPaint);
+                    }
+                };
+                int pvH = (int)(120 * getResources().getDisplayMetrics().density);
+                container.addView(preview, new android.widget.LinearLayout.LayoutParams(
+                        android.view.ViewGroup.LayoutParams.MATCH_PARENT, pvH));
+
+                final android.widget.SeekBar widthSeek = new android.widget.SeekBar(requireContext());
+                widthSeek.setMax(200);
+                widthSeek.setProgress((int)Math.max(1f, overlay.getEraserWidth()));
+                widthSeek.setOnSeekBarChangeListener(new android.widget.SeekBar.OnSeekBarChangeListener() {
+                    @Override public void onProgressChanged(android.widget.SeekBar seekBar, int progress, boolean fromUser) {
+                        float wpx = Math.max(1, progress);
+                        previewPaint.setStrokeWidth(wpx);
+                        preview.invalidate();
+                    }
+                    @Override public void onStartTrackingTouch(android.widget.SeekBar seekBar) { }
+                    @Override public void onStopTrackingTouch(android.widget.SeekBar seekBar) { }
+                });
+                container.addView(widthSeek);
+
+                b.setView(container);
+                b.setNegativeButton("Cancel", null);
+                b.setPositiveButton("Use", (d1,w1)->{
+                    float wpx = Math.max(1, widthSeek.getProgress());
+                    overlay.setEraserWidth(wpx);
+                    overlay.setMode(com.example.staffpad.views.AnnotationOverlayView.ToolMode.ERASER);
+                });
+                b.show();
+                return true;
+            });
             btnUndo.setOnClickListener(v -> overlay.undo());
             btnRedo.setOnClickListener(v -> overlay.redo());
 
@@ -426,17 +472,17 @@ public class SheetDetailFragment extends Fragment {
                 sizeSeek.setProgress(currentSp);
                 container.addView(sizeSeek);
 
-                final android.widget.Spinner colorSpin = new android.widget.Spinner(requireContext());
-                java.util.List<String> cols = java.util.Arrays.asList("Black","Red","Blue","Yellow");
-                android.widget.ArrayAdapter<String> ad = new android.widget.ArrayAdapter<>(requireContext(), android.R.layout.simple_spinner_dropdown_item, cols);
-                colorSpin.setAdapter(ad);
-                int sel = 0;
-                int curColor = textBox.paint.getColor();
-                if (curColor == android.graphics.Color.RED) sel = 1;
-                else if (curColor == android.graphics.Color.BLUE) sel = 2;
-                else if (curColor == android.graphics.Color.YELLOW) sel = 3;
-                colorSpin.setSelection(sel);
-                container.addView(colorSpin);
+                // Color picker for text color
+                final int[] pickedTextColor = new int[]{ textBox.paint.getColor() };
+                final com.skydoves.colorpickerview.ColorPickerView textColorPicker = new com.skydoves.colorpickerview.ColorPickerView.Builder(requireContext()).build();
+                // Use the library's default HSV palette per official docs (no explicit call needed)
+                textColorPicker.setInitialColor(pickedTextColor[0]);
+                textColorPicker.setColorListener((com.skydoves.colorpickerview.listeners.ColorEnvelopeListener) (envelope, fromUser) -> {
+                    pickedTextColor[0] = envelope.getColor();
+                });
+                int cpH3 = (int)(220 * getResources().getDisplayMetrics().density);
+                container.addView(textColorPicker, new android.widget.LinearLayout.LayoutParams(
+                        android.view.ViewGroup.LayoutParams.MATCH_PARENT, cpH3));
 
                 new android.app.AlertDialog.Builder(requireContext())
                         .setTitle("Text Options")
@@ -444,12 +490,7 @@ public class SheetDetailFragment extends Fragment {
                         .setPositiveButton("OK", (dlg, w) -> {
                             textBox.text = input.getText().toString();
                             textBox.bold = cbBold.isChecked();
-                            int color = android.graphics.Color.BLACK;
-                            switch (colorSpin.getSelectedItemPosition()) {
-                                case 1: color = android.graphics.Color.RED; break;
-                                case 2: color = android.graphics.Color.BLUE; break;
-                                case 3: color = android.graphics.Color.YELLOW; break;
-                            }
+                            int color = pickedTextColor[0];
                             textBox.paint.setColor(color);
                             float sz = Math.max(8, sizeSeek.getProgress());
                             textBox.textSizeSp = sz;
@@ -1206,6 +1247,75 @@ public class SheetDetailFragment extends Fragment {
         return isLowMemory() ? 1.3f : 1.6f;
     }
 
+    private void loadPreviousOpsIntoOverlay() {
+        com.example.staffpad.views.AnnotationOverlayView overlay = annotationOverlay;
+        if (overlay == null) return;
+        new Thread(() -> {
+            try {
+                AppDatabase db = AppDatabase.getDatabase(requireContext().getApplicationContext());
+                PageLayerEntity layer = db.pageLayerDao().getActiveAnnotationLayer(currentSheetId, currentPage);
+                if (layer == null || layer.getLayerImagePath() == null) return;
+                File jsonFile = new File(layer.getLayerImagePath().replace(".png", ".json"));
+                if (!jsonFile.exists()) return;
+                String content = new String(java.nio.file.Files.readAllBytes(jsonFile.toPath()));
+                org.json.JSONObject root = new org.json.JSONObject(content);
+                org.json.JSONArray arr = root.optJSONArray("ops");
+                if (arr == null) return;
+                java.util.List<com.example.staffpad.views.AnnotationOverlayView.AnnotationItem> list = new java.util.ArrayList<>();
+                for (int i=0;i<arr.length();i++) {
+                    org.json.JSONObject obj = arr.getJSONObject(i);
+                    String type = obj.optString("type","unknown");
+                    if ("stroke".equals(type)) {
+                        int color = obj.optInt("color", Color.BLACK);
+                        int alpha = obj.optInt("alpha", 255);
+                        float width = (float)obj.optDouble("width", 6.0);
+                        com.example.staffpad.views.AnnotationOverlayView.Stroke s = new com.example.staffpad.views.AnnotationOverlayView.Stroke(color, width, alpha);
+                        org.json.JSONArray pts = obj.optJSONArray("points");
+                        if (pts != null && pts.length() > 0) {
+                            for (int p=0;p<pts.length();p++) {
+                                org.json.JSONArray pp = pts.getJSONArray(p);
+                                float px = (float) pp.getDouble(0);
+                                float py = (float) pp.getDouble(1);
+                                s.addPoint(px, py, p==0);
+                            }
+                        }
+                        list.add(s);
+                    } else if ("erase".equals(type)) {
+                        float width = (float)obj.optDouble("width", 20.0);
+                        com.example.staffpad.views.AnnotationOverlayView.EraseStroke es = new com.example.staffpad.views.AnnotationOverlayView.EraseStroke(width);
+                        org.json.JSONArray pts = obj.optJSONArray("points");
+                        if (pts != null && pts.length() > 0) {
+                            for (int p=0;p<pts.length();p++) {
+                                org.json.JSONArray pp = pts.getJSONArray(p);
+                                float px = (float) pp.getDouble(0);
+                                float py = (float) pp.getDouble(1);
+                                es.addPoint(px, py, p==0);
+                            }
+                        }
+                        list.add(es);
+                    } else if ("text".equals(type)) {
+                        String text = obj.optString("text", "");
+                        float x = (float)obj.optDouble("x", 0.0);
+                        float y = (float)obj.optDouble("y", 0.0);
+                        float sizePx = (float)obj.optDouble("size", 16.0);
+                        int color = obj.optInt("color", Color.BLACK);
+                        boolean bold = obj.optBoolean("bold", false);
+                        com.example.staffpad.views.AnnotationOverlayView.TextBox t = new com.example.staffpad.views.AnnotationOverlayView.TextBox(x, y, color, 16f, bold);
+                        t.text = text;
+                        t.paint.setColor(color);
+                        t.paint.setTextSize(sizePx);
+                        t.paint.setFakeBoldText(bold);
+                        t.textSizeSp = sizePx / getResources().getDisplayMetrics().scaledDensity;
+                        list.add(t);
+                    }
+                }
+                runOnUiThread(() -> overlay.setItemsFromHistory(list));
+            } catch (Throwable t) {
+                Log.w(TAG, "Failed to load previous ops", t);
+            }
+        }).start();
+    }
+
     private void switchToAndroidRendererOnly(File pdfFile) {
         // Close and null PDFBox resources, set androidRendererOnly, and cache page count
         try {
@@ -1348,6 +1458,7 @@ public class SheetDetailFragment extends Fragment {
 
     // Public controls for toolbox Annotate button
     public void enterAnnotationMode() {
+        // While annotating, suppress compositing of persisted annotation layer to enable cross-session undo of last 20 steps
         suppressAnnotationComposite = true;
         View toolbar = annotationToolbar != null ? annotationToolbar : (getView() != null ? getView().findViewById(R.id.annotation_toolbar) : null);
         com.example.staffpad.views.AnnotationOverlayView overlay = annotationOverlay != null ? annotationOverlay : (getView() != null ? getView().findViewById(R.id.annotation_overlay) : null);
@@ -1356,8 +1467,10 @@ public class SheetDetailFragment extends Fragment {
             toolbar.setVisibility(View.VISIBLE);
             overlay.setMode(com.example.staffpad.views.AnnotationOverlayView.ToolMode.PEN);
             if (photoView != null) photoView.setZoomable(false);
-            // Redraw without composited annotation layer while annotating
+            // Redraw base page without persisted annotations
             refreshPage();
+            // Load last 20 ops from previous session if available
+            loadPreviousOpsIntoOverlay();
         }
         if (penPresetList != null) penPresetList.setVisibility(View.VISIBLE);
     }
@@ -1445,6 +1558,7 @@ public class SheetDetailFragment extends Fragment {
         previewPaint.setStrokeCap(Paint.Cap.ROUND);
         previewPaint.setColor(preset.color);
         previewPaint.setStrokeWidth(Math.max(1f, preset.widthPx));
+        previewPaint.setAlpha(preset.alpha);
 
         final View preview = new View(requireContext()) {
             @Override protected void onDraw(Canvas c) {
@@ -1469,7 +1583,7 @@ public class SheetDetailFragment extends Fragment {
         container.addView(nameEt);
 
         final android.widget.SeekBar widthSeek = new android.widget.SeekBar(requireContext());
-        widthSeek.setMax(30);
+        widthSeek.setMax(80);
         widthSeek.setProgress((int)Math.max(1, preset.widthPx));
         widthSeek.setOnSeekBarChangeListener(new android.widget.SeekBar.OnSeekBarChangeListener() {
             @Override public void onProgressChanged(android.widget.SeekBar seekBar, int progress, boolean fromUser) {
@@ -1481,31 +1595,53 @@ public class SheetDetailFragment extends Fragment {
         });
         container.addView(widthSeek);
 
-        final int[] colors = new int[]{ Color.BLACK, Color.RED, Color.BLUE, Color.GREEN, Color.CYAN, Color.MAGENTA, Color.YELLOW };
-        final android.widget.Spinner colorSpin = new android.widget.Spinner(requireContext());
-        java.util.List<String> labels = new java.util.ArrayList<>();
-        for (int c : colors) labels.add(String.format("#%06X", (0xFFFFFF & c)));
-        android.widget.ArrayAdapter<String> ad = new android.widget.ArrayAdapter<>(requireContext(), android.R.layout.simple_spinner_dropdown_item, labels);
-        colorSpin.setAdapter(ad);
-        int sel = 0; for (int i=0;i<colors.length;i++){ if (colors[i]==preset.color){ sel=i; break; } }
-        colorSpin.setSelection(sel);
-        colorSpin.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener() {
-            @Override public void onItemSelected(android.widget.AdapterView<?> parent, View view1, int position, long id) {
-                previewPaint.setColor(colors[position]);
+        // Opacity slider for preset alpha (0-100%)
+        final android.widget.TextView alphaLabel = new android.widget.TextView(requireContext());
+        alphaLabel.setText("Opacity");
+        container.addView(alphaLabel);
+        final android.widget.SeekBar alphaSeek = new android.widget.SeekBar(requireContext());
+        alphaSeek.setMax(100);
+        int initialAlphaPct = (int) Math.round((preset.alpha / 255.0) * 100.0);
+        alphaSeek.setProgress(initialAlphaPct);
+        alphaSeek.setOnSeekBarChangeListener(new android.widget.SeekBar.OnSeekBarChangeListener() {
+            @Override public void onProgressChanged(android.widget.SeekBar seekBar, int progress, boolean fromUser) {
+                int a = (int) Math.round(progress * 2.55);
+                previewPaint.setAlpha(a);
                 preview.invalidate();
             }
-            @Override public void onNothingSelected(android.widget.AdapterView<?> parent) {}
+            @Override public void onStartTrackingTouch(android.widget.SeekBar seekBar) {}
+            @Override public void onStopTrackingTouch(android.widget.SeekBar seekBar) {}
         });
-        container.addView(colorSpin);
+        container.addView(alphaSeek);
+
+        // Color picker for preset color
+        final int[] pickedColor = new int[]{ preset.color };
+        final com.skydoves.colorpickerview.ColorPickerView colorPicker = new com.skydoves.colorpickerview.ColorPickerView.Builder(requireContext()).build();
+        // Use the library's default HSV palette per official docs (no explicit call needed)
+        colorPicker.setInitialColor(preset.color);
+        colorPicker.setColorListener((com.skydoves.colorpickerview.listeners.ColorEnvelopeListener) (envelope, fromUser) -> {
+            pickedColor[0] = envelope.getColor();
+            previewPaint.setColor(pickedColor[0]);
+            preview.invalidate();
+        });
+        int cpH2 = (int)(220 * getResources().getDisplayMetrics().density);
+        container.addView(colorPicker, new android.widget.LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, cpH2));
 
         b.setView(container);
         b.setNegativeButton("Cancel", null);
         b.setPositiveButton("Save", (d,w)->{
             preset.name = nameEt.getText().toString();
             preset.widthPx = Math.max(1, widthSeek.getProgress());
-            preset.color = colors[colorSpin.getSelectedItemPosition()];
+            preset.color = pickedColor[0];
+            preset.alpha = (int) Math.round(alphaSeek.getProgress() * 2.55);
             savePenPresetsToPrefs();
             if (penPresetAdapter != null) penPresetAdapter.notifyItemChanged(index);
+            // Immediately use this edited pen after saving changes
+            if (annotationOverlay != null) {
+                annotationOverlay.setPen(preset.color, preset.widthPx, preset.alpha);
+                annotationOverlay.setMode(com.example.staffpad.views.AnnotationOverlayView.ToolMode.PEN);
+            }
         });
         b.show();
     }
@@ -1567,22 +1703,21 @@ public class SheetDetailFragment extends Fragment {
                         outFile = new File(dir, fileName);
                     }
 
-                    // Write bitmap to file
+                    // Overwrite the annotation layer with ONLY the current overlay content (respecting undo), no compositing
                     try {
                         java.io.FileOutputStream fos = new java.io.FileOutputStream(outFile);
                         finalBmp.compress(Bitmap.CompressFormat.PNG, 100, fos);
-                        fos.flush();
-                        fos.close();
+                        fos.flush(); fos.close();
                     } finally {
                         finalBmp.recycle();
                     }
 
-                    // Save sidecar ops JSON (last 20 items) using captured snapshot
+                    // Save sidecar ops JSON: write ONLY the current snapshot (trim to last 20)
                     try {
                         java.util.List<com.example.staffpad.views.AnnotationOverlayView.AnnotationItem> snapshot = opsSnapshot;
-                        int start = Math.max(0, snapshot.size() - 20);
-                        org.json.JSONArray arr = new org.json.JSONArray();
-                        for (int i = start; i < snapshot.size(); i++) {
+                        org.json.JSONArray trimmed = new org.json.JSONArray();
+                        int startIdx = Math.max(0, snapshot.size() - 20);
+                        for (int i = startIdx; i < snapshot.size(); i++) {
                             com.example.staffpad.views.AnnotationOverlayView.AnnotationItem it = snapshot.get(i);
                             org.json.JSONObject obj = new org.json.JSONObject();
                             if (it instanceof com.example.staffpad.views.AnnotationOverlayView.Stroke) {
@@ -1591,6 +1726,24 @@ public class SheetDetailFragment extends Fragment {
                                 obj.put("color", s.paint.getColor());
                                 obj.put("alpha", s.paint.getAlpha());
                                 obj.put("width", s.paint.getStrokeWidth());
+                                org.json.JSONArray pts = new org.json.JSONArray();
+                                for (float[] p : s.points) {
+                                    org.json.JSONArray pp = new org.json.JSONArray();
+                                    pp.put(p[0]); pp.put(p[1]);
+                                    pts.put(pp);
+                                }
+                                obj.put("points", pts);
+                            } else if (it instanceof com.example.staffpad.views.AnnotationOverlayView.EraseStroke) {
+                                com.example.staffpad.views.AnnotationOverlayView.EraseStroke es = (com.example.staffpad.views.AnnotationOverlayView.EraseStroke) it;
+                                obj.put("type", "erase");
+                                obj.put("width", es.paint.getStrokeWidth());
+                                org.json.JSONArray pts = new org.json.JSONArray();
+                                for (float[] p : es.points) {
+                                    org.json.JSONArray pp = new org.json.JSONArray();
+                                    pp.put(p[0]); pp.put(p[1]);
+                                    pts.put(pp);
+                                }
+                                obj.put("points", pts);
                             } else if (it instanceof com.example.staffpad.views.AnnotationOverlayView.TextBox) {
                                 com.example.staffpad.views.AnnotationOverlayView.TextBox t = (com.example.staffpad.views.AnnotationOverlayView.TextBox) it;
                                 obj.put("type", "text");
@@ -1603,15 +1756,13 @@ public class SheetDetailFragment extends Fragment {
                             } else {
                                 obj.put("type", "unknown");
                             }
-                            arr.put(obj);
+                            trimmed.put(obj);
                         }
-                        org.json.JSONObject root = new org.json.JSONObject();
-                        root.put("ops", arr);
                         File jsonFile = new File(dir, outFile.getName().replace(".png", ".json"));
+                        org.json.JSONObject root = new org.json.JSONObject();
+                        root.put("ops", trimmed);
                         java.io.FileWriter fw = new java.io.FileWriter(jsonFile);
-                        fw.write(root.toString());
-                        fw.flush();
-                        fw.close();
+                        fw.write(root.toString()); fw.flush(); fw.close();
                     } catch (Throwable t) { Log.w(TAG, "Failed writing ops JSON", t);}            
 
                     // Persist the layer (update or insert)
@@ -1631,7 +1782,11 @@ public class SheetDetailFragment extends Fragment {
                     }
 
                     // After saving, exit annotation mode so the saved layer composites on the main screen immediately
-                    runOnUiThread(this::exitAnnotationMode);
+                    runOnUiThread(() -> {
+                        exitAnnotationMode();
+                        // Extra safety: force a follow-up refresh shortly after to avoid any race with file/DB observers
+                        new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> refreshPage(), 150);
+                    });
                 } catch (Throwable t) {
                     Log.e(TAG, "Failed to save annotation layer", t);
                 }
@@ -1641,4 +1796,5 @@ public class SheetDetailFragment extends Fragment {
             Log.e(TAG, "Error saving annotations", e);
         }
     }
+
 }
