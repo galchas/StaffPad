@@ -1545,104 +1545,68 @@ public class SheetDetailFragment extends Fragment {
     private void showEditPresetDialog(int index) {
         if (index < 0 || index >= penPresets.size()) return;
         PenPreset preset = penPresets.get(index);
-        android.app.AlertDialog.Builder b = new android.app.AlertDialog.Builder(requireContext());
-        b.setTitle("Edit Preset");
-        final android.widget.LinearLayout container = new android.widget.LinearLayout(requireContext());
-        container.setOrientation(android.widget.LinearLayout.VERTICAL);
-        int pad = (int)(12 * getResources().getDisplayMetrics().density);
-        container.setPadding(pad, pad, pad, pad);
 
-        // Preview area
-        final Paint previewPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        previewPaint.setStyle(Paint.Style.STROKE);
-        previewPaint.setStrokeCap(Paint.Cap.ROUND);
-        previewPaint.setColor(preset.color);
-        previewPaint.setStrokeWidth(Math.max(1f, preset.widthPx));
-        previewPaint.setAlpha(preset.alpha);
+        android.view.View dialogView = android.view.LayoutInflater.from(requireContext())
+                .inflate(R.layout.dialog_edit_pen_preset, null, false);
 
-        final View preview = new View(requireContext()) {
-            @Override protected void onDraw(Canvas c) {
-                super.onDraw(c);
-                int w = getWidth();
-                int h = getHeight();
-                // light background
-                c.drawColor(0xFFEFEFEF);
-                int cy = h / 2;
-                int left = pad;
-                int right = Math.max(left + 1, w - pad);
-                c.drawLine(left, cy, right, cy, previewPaint);
-            }
-        };
-        int pvH = (int)(64 * getResources().getDisplayMetrics().density);
-        container.addView(preview, new android.widget.LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, pvH));
+        com.example.staffpad.views.PenPreviewView preview = dialogView.findViewById(R.id.penPreview);
+        android.widget.EditText nameEt = dialogView.findViewById(R.id.presetName);
+        com.google.android.material.slider.Slider widthSeek = dialogView.findViewById(R.id.widthSeek);
+        com.google.android.material.slider.Slider alphaSeek = dialogView.findViewById(R.id.alphaSeek);
+        com.skydoves.colorpickerview.ColorPickerView colorPicker = dialogView.findViewById(R.id.colorPickerView);
 
-        final android.widget.EditText nameEt = new android.widget.EditText(requireContext());
-        nameEt.setHint("Name");
+        // Initialize views from preset
         nameEt.setText(preset.name);
-        container.addView(nameEt);
+        preview.setStrokeColor(preset.color);
+        preview.setStrokeWidthPx(Math.max(1f, preset.widthPx));
+        preview.setStrokeAlpha(preset.alpha);
 
-        final android.widget.SeekBar widthSeek = new android.widget.SeekBar(requireContext());
-        widthSeek.setMax(80);
-        widthSeek.setProgress((int)Math.max(1, preset.widthPx));
-        widthSeek.setOnSeekBarChangeListener(new android.widget.SeekBar.OnSeekBarChangeListener() {
-            @Override public void onProgressChanged(android.widget.SeekBar seekBar, int progress, boolean fromUser) {
-                previewPaint.setStrokeWidth(Math.max(1, progress));
-                preview.invalidate();
-            }
-            @Override public void onStartTrackingTouch(android.widget.SeekBar seekBar) {}
-            @Override public void onStopTrackingTouch(android.widget.SeekBar seekBar) {}
+        // Configure width slider
+        widthSeek.setValueFrom(1f);
+        widthSeek.setValueTo(80f);
+        widthSeek.setStepSize(1f);
+        widthSeek.setValue(Math.max(1f, preset.widthPx));
+        widthSeek.addOnChangeListener((slider, value, fromUser) -> {
+            preview.setStrokeWidthPx(Math.max(1f, value));
         });
-        container.addView(widthSeek);
 
-        // Opacity slider for preset alpha (0-100%)
-        final android.widget.TextView alphaLabel = new android.widget.TextView(requireContext());
-        alphaLabel.setText("Opacity");
-        container.addView(alphaLabel);
-        final android.widget.SeekBar alphaSeek = new android.widget.SeekBar(requireContext());
-        alphaSeek.setMax(100);
+        // Configure opacity slider (0-100%)
+        alphaSeek.setValueFrom(0f);
+        alphaSeek.setValueTo(100f);
+        alphaSeek.setStepSize(1f);
         int initialAlphaPct = (int) Math.round((preset.alpha / 255.0) * 100.0);
-        alphaSeek.setProgress(initialAlphaPct);
-        alphaSeek.setOnSeekBarChangeListener(new android.widget.SeekBar.OnSeekBarChangeListener() {
-            @Override public void onProgressChanged(android.widget.SeekBar seekBar, int progress, boolean fromUser) {
-                int a = (int) Math.round(progress * 2.55);
-                previewPaint.setAlpha(a);
-                preview.invalidate();
-            }
-            @Override public void onStartTrackingTouch(android.widget.SeekBar seekBar) {}
-            @Override public void onStopTrackingTouch(android.widget.SeekBar seekBar) {}
+        alphaSeek.setValue(initialAlphaPct);
+        alphaSeek.addOnChangeListener((slider, value, fromUser) -> {
+            int a = (int) Math.round(value * 2.55);
+            preview.setStrokeAlpha(a);
         });
-        container.addView(alphaSeek);
 
-        // Color picker for preset color
+        // Color picker
         final int[] pickedColor = new int[]{ preset.color };
-        final com.skydoves.colorpickerview.ColorPickerView colorPicker = new com.skydoves.colorpickerview.ColorPickerView.Builder(requireContext()).build();
-        // Use the library's default HSV palette per official docs (no explicit call needed)
-        colorPicker.setInitialColor(preset.color);
+        try {
+            colorPicker.setInitialColor(preset.color);
+        } catch (Throwable ignored) {}
         colorPicker.setColorListener((com.skydoves.colorpickerview.listeners.ColorEnvelopeListener) (envelope, fromUser) -> {
             pickedColor[0] = envelope.getColor();
-            previewPaint.setColor(pickedColor[0]);
-            preview.invalidate();
+            preview.setStrokeColor(pickedColor[0]);
         });
-        int cpH2 = (int)(220 * getResources().getDisplayMetrics().density);
-        container.addView(colorPicker, new android.widget.LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, cpH2));
 
-        b.setView(container);
-        b.setNegativeButton("Cancel", null);
-        b.setPositiveButton("Save", (d,w)->{
-            preset.name = nameEt.getText().toString();
-            preset.widthPx = Math.max(1, widthSeek.getProgress());
-            preset.color = pickedColor[0];
-            preset.alpha = (int) Math.round(alphaSeek.getProgress() * 2.55);
-            savePenPresetsToPrefs();
-            if (penPresetAdapter != null) penPresetAdapter.notifyItemChanged(index);
-            // Immediately use this edited pen after saving changes
-            if (annotationOverlay != null) {
-                annotationOverlay.setPen(preset.color, preset.widthPx, preset.alpha);
-                annotationOverlay.setMode(com.example.staffpad.views.AnnotationOverlayView.ToolMode.PEN);
-            }
-        });
+        android.app.AlertDialog.Builder b = new android.app.AlertDialog.Builder(requireContext())
+                .setTitle("Edit Preset")
+                .setView(dialogView)
+                .setNegativeButton("Cancel", null)
+                .setPositiveButton("Save", (d, w) -> {
+                    preset.name = nameEt.getText().toString();
+                    preset.widthPx = Math.max(1f, widthSeek.getValue());
+                    preset.color = pickedColor[0];
+                    preset.alpha = (int) Math.round(alphaSeek.getValue() * 2.55);
+                    savePenPresetsToPrefs();
+                    if (penPresetAdapter != null) penPresetAdapter.notifyItemChanged(index);
+                    if (annotationOverlay != null) {
+                        annotationOverlay.setPen(preset.color, preset.widthPx, preset.alpha);
+                        annotationOverlay.setMode(com.example.staffpad.views.AnnotationOverlayView.ToolMode.PEN);
+                    }
+                });
         b.show();
     }
 
@@ -1657,23 +1621,54 @@ public class SheetDetailFragment extends Fragment {
             // Capture snapshot of items BEFORE clearing overlay (used for sidecar JSON)
             final java.util.List<com.example.staffpad.views.AnnotationOverlayView.AnnotationItem> opsSnapshot = overlay.getItemsSnapshot();
 
-            // Determine base image size from the PhotoView drawable if available; otherwise use overlay size
+            // Map overlay (view space) into the underlying image (drawable) space using PhotoView's display matrix.
+            // Fallback to simple scaling if required information is missing.
+            Bitmap finalBmp = null;
             int targetW = overlayBmp.getWidth();
             int targetH = overlayBmp.getHeight();
             try {
                 android.graphics.drawable.Drawable d = photoView.getDrawable();
-                if (d != null && d.getIntrinsicWidth() > 0 && d.getIntrinsicHeight() > 0) {
+                android.graphics.RectF displayRect = photoView.getDisplayRect();
+                if (d != null && d.getIntrinsicWidth() > 0 && d.getIntrinsicHeight() > 0 && displayRect != null && displayRect.width() > 0 && displayRect.height() > 0) {
                     targetW = d.getIntrinsicWidth();
                     targetH = d.getIntrinsicHeight();
-                }
-            } catch (Throwable ignored) {}
 
-            Bitmap finalBmp;
-            if (overlayBmp.getWidth() != targetW || overlayBmp.getHeight() != targetH) {
-                finalBmp = Bitmap.createScaledBitmap(overlayBmp, targetW, targetH, true);
-                if (finalBmp != overlayBmp) overlayBmp.recycle();
-            } else {
-                finalBmp = overlayBmp;
+                    // drawable -> view transform is: scale by sx,sy then translate by tx,ty
+                    float sx = displayRect.width() / (float) targetW;
+                    float sy = displayRect.height() / (float) targetH;
+                    float tx = displayRect.left;
+                    float ty = displayRect.top;
+
+                    // We need inverse to map view-space overlay into drawable-space
+                    android.graphics.Matrix inv = new android.graphics.Matrix();
+                    inv.postTranslate(-tx, -ty);
+                    inv.postScale(1f / Math.max(1e-6f, sx), 1f / Math.max(1e-6f, sy));
+
+                    finalBmp = Bitmap.createBitmap(targetW, targetH, Bitmap.Config.ARGB_8888);
+                    android.graphics.Canvas mapCanvas = new android.graphics.Canvas(finalBmp);
+                    mapCanvas.drawBitmap(overlayBmp, inv, null);
+                    // We no longer need the overlay bitmap
+                    overlayBmp.recycle();
+                }
+            } catch (Throwable t) {
+                android.util.Log.w(TAG, "Falling back to naive scaling during save due to mapping error", t);
+            }
+
+            if (finalBmp == null) {
+                // Fallback: scale overlay bitmap to drawable's intrinsic size if available, else keep as-is
+                try {
+                    android.graphics.drawable.Drawable d = photoView.getDrawable();
+                    if (d != null && d.getIntrinsicWidth() > 0 && d.getIntrinsicHeight() > 0) {
+                        targetW = d.getIntrinsicWidth();
+                        targetH = d.getIntrinsicHeight();
+                    }
+                } catch (Throwable ignored) {}
+                if (overlayBmp.getWidth() != targetW || overlayBmp.getHeight() != targetH) {
+                    finalBmp = Bitmap.createScaledBitmap(overlayBmp, targetW, targetH, true);
+                    if (finalBmp != overlayBmp) overlayBmp.recycle();
+                } else {
+                    finalBmp = overlayBmp;
+                }
             }
 
             // Immediately clear overlay on UI thread to avoid on-screen duplication
@@ -1687,6 +1682,8 @@ public class SheetDetailFragment extends Fragment {
             Context appCtx = requireContext().getApplicationContext();
             final File[] outFileHolder = new File[1];
             final long nowTs = System.currentTimeMillis();
+            // Make bitmap effectively final for use inside the background thread
+            final Bitmap finalBmpToSave = finalBmp;
             new Thread(() -> {
                 try {
                     AppDatabase db = AppDatabase.getDatabase(appCtx);
@@ -1706,10 +1703,10 @@ public class SheetDetailFragment extends Fragment {
                     // Overwrite the annotation layer with ONLY the current overlay content (respecting undo), no compositing
                     try {
                         java.io.FileOutputStream fos = new java.io.FileOutputStream(outFile);
-                        finalBmp.compress(Bitmap.CompressFormat.PNG, 100, fos);
+                        finalBmpToSave.compress(Bitmap.CompressFormat.PNG, 100, fos);
                         fos.flush(); fos.close();
                     } finally {
-                        finalBmp.recycle();
+                        finalBmpToSave.recycle();
                     }
 
                     // Save sidecar ops JSON: write ONLY the current snapshot (trim to last 20)

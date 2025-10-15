@@ -62,4 +62,9 @@
     <string name="undo">Undo</string>
     <string name="eraser">Eraser</string>
     <string name="pen_settings">Pen settings</string>
+    <string name="opacity">Opacity</string>
+    <string name="width">Width</string>
+    <string name="name">Name</string>
+    <string name="brightness_0">Brightness: 0</string>
+    <string name="contrast_1_00">Contrast: 1.00</string>
 </resources>
