@@ -81,6 +81,8 @@ public class SheetMetadataDialog extends BottomSheetDialogFragment {
     // Audio file picker
     private ActivityResultLauncher<Intent> audioPickerLauncher;
 
+    private SheetViewModel sheetViewModel;
+
     public static SheetMetadataDialog newInstance(SheetMusic sheetMusic) {
         SheetMetadataDialog dialog = new SheetMetadataDialog();
         Bundle args = new Bundle();
@@ -97,6 +99,16 @@ public class SheetMetadataDialog extends BottomSheetDialogFragment {
         if (getArguments() != null) {
             sheetMusic = getArguments().getParcelable("sheet_music");
         }
+        try {
+            sheetViewModel = new ViewModelProvider(requireActivity()).get(SheetViewModel.class);
+            if (sheetMusic != null) {
+                sheetViewModel.selectSheet(sheetMusic.getId());
+            }
+        } catch (Throwable t) {
+            Log.w("SheetMetadataDialog", "Failed to init ViewModel", t);
+        }
+        // Per requirement: stop audio when entering metadata
+        try { com.example.staffpad.SheetDetailFragment.requestPausePlayback(); } catch (Throwable ignore) {} 
 
         // Initialize audio picker launcher
         audioPickerLauncher = registerForActivityResult(
@@ -105,8 +117,12 @@ public class SheetMetadataDialog extends BottomSheetDialogFragment {
                     if (result.getResultCode() == Activity.RESULT_OK && result.getData() != null) {
                         Uri audioUri = result.getData().getData();
                         if (audioUri != null) {
-                            // Add the audio file to the sheet music
-                            addAudioFile(audioUri);
+                            if (sheetViewModel != null) {
+                                try { sheetViewModel.addAudioToSelectedSheet(audioUri); } catch (Throwable t) { Log.e("SheetMetadataDialog","addAudioToSelectedSheet failed", t); }
+                            } else {
+                                // Fallback to previous behavior if ViewModel not ready
+                                addAudioFile(audioUri);
+                            }
                         }
                     }
                 }
@@ -270,26 +286,34 @@ public class SheetMetadataDialog extends BottomSheetDialogFragment {
 
         RecyclerView recyclerView = audioView.findViewById(R.id.audio_recycler_view);
         recyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
-
-        // No audio text
         TextView noAudioText = audioView.findViewById(R.id.no_audio_text);
+        android.widget.EditText inputLink = audioView.findViewById(R.id.input_youtube_link);
+        View btnAddLink = audioView.findViewById(R.id.btn_add_link);
 
-        // Set visibility based on whether there are audio files
-        if (sheetMusic.getAudioFiles().isEmpty()) {
-            noAudioText.setVisibility(View.VISIBLE);
-            recyclerView.setVisibility(View.GONE);
-        } else {
-            noAudioText.setVisibility(View.GONE);
-            recyclerView.setVisibility(View.VISIBLE);
+        if (sheetViewModel == null) {
+            sheetViewModel = new ViewModelProvider(requireActivity()).get(SheetViewModel.class);
         }
+        try {
+            // Ensure the selected sheet is the one for this dialog
+            if (sheetMusic != null) {
+                sheetViewModel.selectSheet(sheetMusic.getId());
+            }
+        } catch (Throwable ignore) {}
 
-        // Create adapter
-        AudioAdapter adapter = new AudioAdapter(sheetMusic.getAudioFiles());
+        AudioEntityAdapter adapter = new AudioEntityAdapter(new ArrayList<>());
         recyclerView.setAdapter(adapter);
 
-        // Setup audio control buttons
-        View.OnClickListener deleteListener = v -> deleteSelectedAudioFiles(adapter);
-        audioView.findViewById(R.id.delete_audio_button).setOnClickListener(deleteListener);
+        // Observe DB audio list
+        try {
+            sheetViewModel.getAudioFilesForSelectedSheet().observe(SheetMetadataDialog.this, list -> {
+                adapter.setItems(list != null ? list : new ArrayList<>());
+                boolean empty = list == null || list.isEmpty();
+                noAudioText.setVisibility(empty ? View.VISIBLE : View.GONE);
+                recyclerView.setVisibility(empty ? View.GONE : View.VISIBLE);
+            });
+        } catch (Throwable t) {
+            Log.w("SheetMetadataDialog", "Failed to observe audio list", t);
+        }
 
         audioView.findViewById(R.id.add_audio_button).setOnClickListener(v -> {
             Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
@@ -297,8 +321,28 @@ public class SheetMetadataDialog extends BottomSheetDialogFragment {
             audioPickerLauncher.launch(Intent.createChooser(intent, "Select Audio File"));
         });
 
+        if (btnAddLink != null && inputLink != null) {
+            btnAddLink.setOnClickListener(v -> {
+                String url = String.valueOf(inputLink.getText()).trim();
+                if (url.isEmpty()) {
+                    Toast.makeText(getContext(), "Please paste a YouTube link", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                String low = url.toLowerCase();
+                if (!(low.contains("youtube.com/watch") || low.contains("youtu.be/"))) {
+                    Toast.makeText(getContext(), "Invalid YouTube link", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                try {
+                    sheetViewModel.addAudioLinkToSelectedSheet(url);
+                    inputLink.setText("");
+                } catch (Throwable t) {
+                    Toast.makeText(getContext(), "Failed to add link", Toast.LENGTH_SHORT).show();
+                }
+            });
+        }
+
         audioView.findViewById(R.id.dismiss_audio_button).setOnClickListener(v -> {
-            // Just show another section
             updateTabButtonStyles(propertiesButton);
             showPropertiesContent();
         });
@@ -817,6 +861,57 @@ public class SheetMetadataDialog extends BottomSheetDialogFragment {
                 detailsView = itemView.findViewById(R.id.audio_details);
                 checkBox = itemView.findViewById(R.id.audio_checkbox);
                 playButton = itemView.findViewById(R.id.play_audio_button);
+            }
+        }
+    }
+
+    // Adapter over AudioEntity from Room
+    private class AudioEntityAdapter extends RecyclerView.Adapter<AudioEntityAdapter.VH> {
+        private final List<com.example.staffpad.database.AudioEntity> items;
+        AudioEntityAdapter(List<com.example.staffpad.database.AudioEntity> initial) {
+            this.items = new ArrayList<>();
+            if (initial != null) this.items.addAll(initial);
+        }
+        void setItems(List<com.example.staffpad.database.AudioEntity> list) {
+            this.items.clear();
+            if (list != null) this.items.addAll(list);
+            notifyDataSetChanged();
+        }
+        @NonNull @Override public VH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+            View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.audio_item, parent, false);
+            return new VH(view);
+        }
+        @Override public void onBindViewHolder(@NonNull VH h, int position) {
+            com.example.staffpad.database.AudioEntity e = items.get(position);
+            h.nameView.setText(e.getName() != null ? e.getName() : "Audio");
+            String details;
+            if (e.getDurationFormatted() != null && !e.getDurationFormatted().isEmpty()) {
+                details = e.getDurationFormatted();
+            } else if (e.getDuration() > 0) {
+                long m = (e.getDuration() / 1000) / 60; long s = (e.getDuration()/1000)%60; details = m+":"+(s<10?"0"+s:s);
+            } else {
+                details = "0:00";
+            }
+            long size = e.getSize();
+            if (size > 0) {
+                double val = size; int unit = 0; String[] u = {"B","KB","MB","GB","TB"};
+                while (val >= 1024 && unit < u.length-1) { val/=1024; unit++; }
+                details = details + " • " + String.format("%.1f %s", val, u[unit]);
+            }
+            h.detailsView.setText(details);
+
+            h.deleteButton.setOnClickListener(v -> {
+                try { if (sheetViewModel != null) sheetViewModel.removeAudioFromSelectedSheet(e.getId()); } catch (Throwable t) { Log.w("SheetMetadataDialog","Delete audio failed", t);} });
+            h.playButton.setOnClickListener(v -> Toast.makeText(getContext(), "Use bottom player to play", Toast.LENGTH_SHORT).show());
+        }
+        @Override public int getItemCount() { return items.size(); }
+        class VH extends RecyclerView.ViewHolder {
+            final TextView nameView; final TextView detailsView; final android.widget.ImageButton playButton; final android.widget.ImageButton deleteButton;
+            VH(@NonNull View itemView) { super(itemView);
+                nameView = itemView.findViewById(R.id.audio_name);
+                detailsView = itemView.findViewById(R.id.audio_details);
+                playButton = itemView.findViewById(R.id.play_audio_button);
+                deleteButton = itemView.findViewById(R.id.delete_audio_button);
             }
         }
     }

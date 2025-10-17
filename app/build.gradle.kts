@@ -63,6 +63,9 @@ dependencies {
     implementation(libs.photoview)
     implementation(libs.colorpickerview)
 
+    //YOUTUBE PLAYER
+    implementation(libs.androidyoutubeplayercore)
+
 
 
 }

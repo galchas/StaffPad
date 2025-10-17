@@ -62,14 +62,14 @@
                 android:layout_height="40dp"
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:src="@drawable/round_arrow_back_ios_24"
-                android:contentDescription="Rotate Left"
+                android:contentDescription="@string/rotate_left"
                 app:tint="#FFFFFF" />
 
             <TextView
                 android:id="@+id/rotation_label"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Align: 0°"
+                android:text="@string/align_0"
                 android:textColor="#FFFFFF"
                 android:textSize="14sp"
                 android:layout_marginStart="12dp"
@@ -82,7 +82,9 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:valueFrom="-10"
+                app:thumbStrokeColor="@color/purple_500"
                 android:valueTo="10"
+                app:trackColor="@color/purple_500"
                 android:stepSize="0.1" />
 
             <ImageButton
@@ -120,7 +122,9 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:valueFrom="-100"
+            app:trackColor="@color/purple_500"
             android:valueTo="100"
+            app:thumbStrokeColor="@color/purple_500"
             android:stepSize="1"
             android:layout_marginBottom="16dp" />
 
@@ -141,7 +145,9 @@
             android:layout_height="wrap_content"
             android:valueFrom="0.5"
             android:valueTo="2.0"
+            app:thumbStrokeColor="@color/purple_500"
             android:stepSize="0.01"
+            app:trackColor="@color/purple_500"
             android:layout_marginBottom="16dp" />
 
         <!-- Action buttons -->
@@ -166,7 +172,7 @@
                 style="@style/Widget.MaterialComponents.Button.OutlinedButton"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Restore"
+                android:text="@string/restore"
                 android:textColor="#FFFFFF"
                 android:layout_marginEnd="8dp"
                 app:strokeColor="#FFFFFF" />

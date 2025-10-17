@@ -129,4 +129,14 @@
             android:src="@drawable/round_menu_24" />
     </LinearLayout>
 
+    <!-- Bottom player dialog is lazily inflated to avoid heavy startup work -->
+    <ViewStub
+        android:id="@+id/bottom_player_stub"
+        android:inflatedId="@+id/bottom_player_container"
+        android:layout="@layout/bottom_dialog_player"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:visibility="gone" />
+
 </FrameLayout>

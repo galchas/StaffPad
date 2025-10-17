@@ -88,17 +88,43 @@
             app:tint="#666666" />
     </androidx.constraintlayout.widget.ConstraintLayout>
 
+    <!-- YouTube link input row -->
+    <LinearLayout
+        android:id="@+id/link_input_row"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:orientation="horizontal"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/audio_control_bar">
+
+        <EditText
+            android:id="@+id/input_youtube_link"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:hint="Paste YouTube link"
+            android:inputType="textUri" />
+
+        <Button
+            android:id="@+id/btn_add_link"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Add Link" />
+    </LinearLayout>
+
     <TextView
         android:id="@+id/audio_subtitle"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
+        android:layout_marginTop="12dp"
         android:text="@string/audio_files_associated_with_this_sheet"
         android:textColor="#666666"
         android:textSize="14sp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/audio_control_bar" />
+        app:layout_constraintTop_toBottomOf="@id/link_input_row" />
 
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/audio_recycler_view"

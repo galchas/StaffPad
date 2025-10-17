@@ -30,7 +30,7 @@
         android:textColor="#333333"
         android:textSize="16sp"
         app:layout_constraintBottom_toTopOf="@id/audio_details"
-        app:layout_constraintEnd_toStartOf="@id/play_audio_button"
+        app:layout_constraintEnd_toStartOf="@id/delete_audio_button"
         app:layout_constraintStart_toEndOf="@id/audio_checkbox"
         app:layout_constraintTop_toTopOf="parent"
         tools:text="Moonlight Sonata - Recording.mp3" />
@@ -44,7 +44,7 @@
         android:textColor="#666666"
         android:textSize="14sp"
         app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toStartOf="@id/play_audio_button"
+        app:layout_constraintEnd_toStartOf="@id/delete_audio_button"
         app:layout_constraintStart_toEndOf="@id/audio_checkbox"
         app:layout_constraintTop_toBottomOf="@id/audio_name"
         tools:text="5:32 • 8.2 MB" />
@@ -58,8 +58,21 @@
         android:padding="8dp"
         android:src="@drawable/round_play_arrow_24"
         app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintEnd_toStartOf="@id/delete_audio_button"
         app:layout_constraintTop_toTopOf="parent"
         app:tint="#404040" />
+
+    <ImageButton
+        android:id="@+id/delete_audio_button"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:contentDescription="Delete audio"
+        android:padding="8dp"
+        android:src="@drawable/round_delete_forever_24"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:tint="#A00000" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

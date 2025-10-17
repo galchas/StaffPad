@@ -20,6 +20,7 @@
             android:id="@+id/presetName"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:autofillHints="Preset Name"
             android:hint="@string/name"
             android:inputType="textCapWords"
             android:layout_marginBottom="8dp"/>

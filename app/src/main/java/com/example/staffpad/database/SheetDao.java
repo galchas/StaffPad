@@ -25,6 +25,9 @@ public interface SheetDao {
     @Query("SELECT * FROM sheets WHERE id = :id")
     LiveData<SheetEntity> getSheetById(long id);
 
+    @Query("SELECT * FROM sheets WHERE id = :id")
+    SheetEntity getSheetByIdSync(long id);
+
     @Query("SELECT * FROM sheets ORDER BY title ASC")
     LiveData<List<SheetEntity>> getAllSheets();
 

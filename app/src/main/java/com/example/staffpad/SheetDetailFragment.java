@@ -8,9 +8,12 @@ import android.graphics.Paint;
 import android.graphics.RectF;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.GestureDetector;
 import android.view.LayoutInflater;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ImageView;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
@@ -20,6 +23,8 @@ import androidx.lifecycle.LiveData;
 
 import com.example.staffpad.database.SheetEntity;
 import com.example.staffpad.viewmodel.SheetViewModel;
+import com.example.staffpad.views.AnnotationOverlayView;
+import com.github.chrisbanes.photoview.OnPhotoTapListener;
 import com.github.chrisbanes.photoview.PhotoView;
 import com.github.chrisbanes.photoview.OnViewTapListener;
 import com.tom_roush.pdfbox.pdmodel.PDDocument;
@@ -31,6 +36,10 @@ import com.example.staffpad.database.AppDatabase;
 import com.example.staffpad.database.PageSettingsEntity;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
+import android.media.MediaPlayer;
+import android.net.Uri;
+import com.google.android.material.slider.Slider;
+import com.example.staffpad.database.AudioEntity;
 
 import java.io.File;
 import java.io.IOException;
@@ -42,6 +51,50 @@ import android.app.ActivityManager;
 import android.content.Context;
 
 public class SheetDetailFragment extends Fragment {
+    // Keep a weak reference to the latest instance so other UI parts can request a pause
+    private static java.lang.ref.WeakReference<SheetDetailFragment> sLastInstanceRef = new java.lang.ref.WeakReference<>(null);
+
+    public static void requestPausePlayback() {
+        SheetDetailFragment inst = sLastInstanceRef.get();
+        if (inst != null) {
+            try { inst.stopPlayerIfPlaying(); } catch (Throwable ignore) {}
+        }
+    }
+    // --- Audio/Video bottom player state ---
+    private static class Track {
+        enum Type { FILE, YOUTUBE }
+        Type type;
+        String title;
+        String uri; // for FILE: content/file uri; for YOUTUBE: full url
+        long durationMs; // known for FILE if available
+        Track(Type type, String title, String uri, long durationMs) {
+            this.type = type; this.title = title; this.uri = uri; this.durationMs = durationMs;
+        }
+    }
+    private final List<Track> playlist = new ArrayList<>();
+    private int currentTrackIndex = 0;
+    private android.media.MediaPlayer mediaPlayer;
+    private com.google.android.material.slider.Slider timeSlider;
+    private com.google.android.material.slider.Slider volumeSlider;
+    private ImageView btnPrev, btnNext, btnRestart, btnPlay, btnPause;
+    private TextView trackNameView, trackTimeView;
+    private android.os.Handler progressHandler;
+    private final Runnable progressRunnable = new Runnable() {
+        @Override public void run() {
+            updateProgressUi();
+            if (progressHandler != null) progressHandler.postDelayed(this, 500);
+        }
+    };
+    private View audioArtwork;
+    private boolean restartArmed = false; // for double-click behavior on restart
+    // Playback readiness flags to handle Play pressed before player is ready
+    private boolean mpPrepared = false;
+    private boolean mpPendingPlay = false;
+    private boolean ytPendingPlay = false;
+    // Bottom player dialog container, toggled with center single tap
+    private View bottomPlayerContainer;
+    private com.pierfrancescosoffritti.androidyoutubeplayer.core.player.views.YouTubePlayerView youTubePlayerView;
+    private com.pierfrancescosoffritti.androidyoutubeplayer.core.player.YouTubePlayer youTubePlayer;
     // When true, we suppress compositing the persisted annotation bitmap while in annotation mode.
     private boolean suppressAnnotationComposite = false;
     private static final String TAG = "SheetDetailFragment";
@@ -154,6 +207,7 @@ public class SheetDetailFragment extends Fragment {
             holder.colorView.setBackground(circle);
             holder.itemView.setOnClickListener(v -> {
                 if (annotationOverlay != null) {
+                    stopPlayerIfPlaying();
                     annotationOverlay.setPen(p.color, p.widthPx, p.alpha);
                     annotationOverlay.setMode(com.example.staffpad.views.AnnotationOverlayView.ToolMode.PEN);
                 }
@@ -172,14 +226,20 @@ public class SheetDetailFragment extends Fragment {
 
     @Override
     public void onViewCreated(@NonNull View view, Bundle savedInstanceState) {
+            sLastInstanceRef = new java.lang.ref.WeakReference<>(this);
         super.onViewCreated(view, savedInstanceState);
         photoView = view.findViewById(R.id.photo_view);
+        // Bottom player is now lazy-inflated via ViewStub; do not touch until needed
+        bottomPlayerContainer = view.findViewById(R.id.bottom_player_container); // may be null until inflated
+        youTubePlayerView = null; // will be assigned upon inflation
+        // Ensure navigation gestures are attached as early as possible
+        setupPageNavigation();
 
         // Annotation UI setup (no standalone entry button; controlled via toolbox)
         annotationToolbar = view.findViewById(R.id.annotation_toolbar);
         annotationOverlay = view.findViewById(R.id.annotation_overlay);
         View toolbar = annotationToolbar;
-        com.example.staffpad.views.AnnotationOverlayView overlay = annotationOverlay;
+        AnnotationOverlayView overlay = annotationOverlay;
         if (toolbar != null && overlay != null) {
             // Draggable toolbar (vertical drag only as per requirement)
             toolbar.setOnTouchListener(new View.OnTouchListener() {
@@ -219,7 +279,10 @@ public class SheetDetailFragment extends Fragment {
                 penPresetAdapter.notifyDataSetChanged();
             }
 
-            btnText.setOnClickListener(v -> overlay.setMode(com.example.staffpad.views.AnnotationOverlayView.ToolMode.TEXT));
+            btnText.setOnClickListener(v -> {
+                stopPlayerIfPlaying();
+                overlay.setMode(com.example.staffpad.views.AnnotationOverlayView.ToolMode.TEXT);
+            });
             btnPen.setOnClickListener(v -> {
                 android.app.AlertDialog.Builder b = new android.app.AlertDialog.Builder(requireContext());
                 b.setTitle("Pen Settings");
@@ -502,6 +565,13 @@ public class SheetDetailFragment extends Fragment {
                         .show();
             });
 
+            if (btnEraser != null) {
+                btnEraser.setOnClickListener(v -> {
+                    stopPlayerIfPlaying();
+                    overlay.setMode(com.example.staffpad.views.AnnotationOverlayView.ToolMode.ERASER);
+                });
+            }
+
             btnSave.setOnClickListener(v -> {
                 saveAnnotations(overlay);
             });
@@ -514,6 +584,25 @@ public class SheetDetailFragment extends Fragment {
         }
 
         if (sheetId != -1) {
+            // Tell ViewModel which sheet is active so audio list can be observed
+            try { sheetViewModel.selectSheet(sheetId); } catch (Throwable ignore) {}
+
+            // Observe audio attachments for this sheet
+            try {
+                sheetViewModel.getAudioFilesForSelectedSheet().observe(getViewLifecycleOwner(), list -> {
+                    buildPlaylistFromAudioEntities(list);
+                    if (!playlist.isEmpty()) {
+                        inflateBottomPlayerIfNeeded();
+                        loadTrack(0, false);
+                        showBottomDialog();
+                    } else {
+                        hideBottomDialog();
+                    }
+                });
+            } catch (Throwable t) {
+                Log.w(TAG, "Failed to observe audio files", t);
+            }
+
             // Observe the sheet ONCE to avoid repeated re-renders when DB fields (like lastOpened) change
             final androidx.lifecycle.LiveData<com.example.staffpad.database.SheetEntity> live = sheetViewModel.getSheetById(sheetId);
             final androidx.lifecycle.Observer<com.example.staffpad.database.SheetEntity> onceObserver = new androidx.lifecycle.Observer<com.example.staffpad.database.SheetEntity>() {
@@ -528,6 +617,9 @@ public class SheetDetailFragment extends Fragment {
         }
     }
     private void displaySheet(SheetEntity sheet) {
+        // Stop playback when switching to another sheet
+        stopPlayerIfPlaying();
+        releaseMediaPlayer();
         if (sheet == null) {
             Log.e(TAG, "Sheet not found for id: " + sheetId);
             return;
@@ -941,6 +1033,7 @@ public class SheetDetailFragment extends Fragment {
 
     @Override
     public void onPause() {
+        // Clear static ref if fragment is going to background? keep until destroyed
         super.onPause();
 
         // Save the current page when leaving the fragment
@@ -948,6 +1041,8 @@ public class SheetDetailFragment extends Fragment {
             preferencesHelper.saveLastViewedPage(currentSheetId, currentPage);
             Log.d(TAG, "onPause: Saved last viewed page: " + currentPage);
         }
+        // Pause playback when user leaves activity (stop condition)
+        stopPlayerIfPlaying();
     }
 
     private Bitmap applyRotation(Bitmap bitmap, float rotation) {
@@ -1056,41 +1151,488 @@ public class SheetDetailFragment extends Fragment {
     }
 
 
+    private void toggleUiChrome() {
+        try {
+            // Toggle top app toolbar in activity
+            androidx.fragment.app.FragmentActivity act = requireActivity();
+            View toolbar = act.findViewById(R.id.app_toolbar);
+            if (toolbar != null) {
+                toolbar.setVisibility(toolbar.getVisibility() == View.VISIBLE ? View.GONE : View.VISIBLE);
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "toggleUiChrome: could not toggle app toolbar", t);
+        }
+        // Toggle bottom player lazily
+        if (!isBottomDialogVisible()) {
+            inflateBottomPlayerIfNeeded();
+            showBottomDialog();
+        } else {
+            hideBottomDialog();
+        }
+    }
+
+    private void inflateBottomPlayerIfNeeded() {
+        if (bottomPlayerContainer != null) return; // already inflated
+        try {
+            View root = getView();
+            if (root == null) return;
+            View stubView = root.findViewById(R.id.bottom_player_stub);
+            if (stubView instanceof android.view.ViewStub) {
+                android.view.View inflated = ((android.view.ViewStub) stubView).inflate();
+                bottomPlayerContainer = inflated; // id becomes bottom_player_container
+
+                // Bind views
+                btnPrev = inflated.findViewById(R.id.btnPrevTrack);
+                btnNext = inflated.findViewById(R.id.btnNextTrack);
+                btnRestart = inflated.findViewById(R.id.btnRestart);
+                btnPlay = inflated.findViewById(R.id.btnPlay);
+                btnPause = inflated.findViewById(R.id.btnPause);
+                trackNameView = inflated.findViewById(R.id.trackName);
+                trackTimeView = inflated.findViewById(R.id.trackTime);
+                timeSlider = inflated.findViewById(R.id.sliderTime);
+                volumeSlider = inflated.findViewById(R.id.volumeSlider);
+                audioArtwork = inflated.findViewById(R.id.audioArtwork);
+
+                // Wire YouTube player
+                youTubePlayerView = inflated.findViewById(R.id.youTunePlayer);
+                if (youTubePlayerView != null) {
+                    youTubePlayerView.getYouTubePlayerWhenReady(player -> youTubePlayer = player);
+                    youTubePlayerView.addYouTubePlayerListener(new com.pierfrancescosoffritti.androidyoutubeplayer.core.player.listeners.AbstractYouTubePlayerListener() {
+                        private float ytDuration = 0f;
+                        private float ytCurrent = 0f;
+                        @Override
+                        public void onReady(com.pierfrancescosoffritti.androidyoutubeplayer.core.player.YouTubePlayer youTubePlayerInstance) {
+                            youTubePlayer = youTubePlayerInstance;
+                            // Ensure current YouTube track is loaded when player becomes ready
+                            Track current = getCurrentTrack();
+                            if (current != null && current.type == Track.Type.YOUTUBE) {
+                                String videoId = extractYouTubeId(current.uri);
+                                if (videoId != null) {
+                                    try {
+                                        youTubePlayer.cueVideo(videoId, 0f);
+                                        if (ytPendingPlay) {
+                                            ytPendingPlay = false;
+                                            youTubePlayer.play();
+                                        }
+                                    } catch (Throwable ignore) {}
+                                }
+                            }
+                        }
+                        @Override
+                        public void onCurrentSecond(com.pierfrancescosoffritti.androidyoutubeplayer.core.player.YouTubePlayer youTubePlayer, float second) {
+                            ytCurrent = second;
+                            updateYouTubeProgress(ytCurrent, ytDuration);
+                        }
+                        @Override
+                        public void onVideoDuration(com.pierfrancescosoffritti.androidyoutubeplayer.core.player.YouTubePlayer youTubePlayer, float duration) {
+                            ytDuration = duration;
+                            updateYouTubeProgress(ytCurrent, ytDuration);
+                        }
+                    });
+                }
+
+                // Listeners
+                if (btnPrev != null) btnPrev.setOnClickListener(v -> prevTrack());
+                if (btnNext != null) btnNext.setOnClickListener(v -> nextTrack());
+                if (btnPlay != null) btnPlay.setOnClickListener(v -> play());
+                if (btnPause != null) btnPause.setOnClickListener(v -> pause());
+                if (btnRestart != null) btnRestart.setOnClickListener(v -> onRestartClicked());
+
+                if (timeSlider != null) {
+                    timeSlider.setValueFrom(0f);
+                    timeSlider.addOnChangeListener((slider, value, fromUser) -> {
+                        // Only seek on user changes at touch end to avoid jitter; handled below
+                    });
+                    timeSlider.addOnSliderTouchListener(new Slider.OnSliderTouchListener() {
+                        @Override public void onStartTrackingTouch(@NonNull Slider slider) {}
+                        @Override public void onStopTrackingTouch(@NonNull Slider slider) {
+                            seekTo((long) slider.getValue());
+                        }
+                    });
+                }
+                if (volumeSlider != null) {
+                    volumeSlider.setValueFrom(0f);
+                    volumeSlider.setValueTo(100f);
+                    volumeSlider.setValue(100f);
+                    volumeSlider.addOnChangeListener((s, value, fromUser) -> setVolume(value / 100f));
+                }
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "inflateBottomPlayerIfNeeded: failed to inflate bottom player", t);
+        }
+    }
+
+    private void updateYouTubeProgress(float currentSec, float durationSec) {
+        if (timeSlider == null || trackTimeView == null) return;
+        long curMs = (long)(currentSec * 1000);
+        long durMs = (long)(durationSec * 1000);
+        timeSlider.setValueTo(Math.max(1, durMs));
+        timeSlider.setValue(curMs);
+        trackTimeView.setText(formatTime(curMs) + " / " + formatTime(durMs));
+    }
+
+    private void setVolume(float v) {
+        v = Math.max(0f, Math.min(1f, v));
+        try {
+            if (mediaPlayer != null) {
+                mediaPlayer.setVolume(v, v);
+            }
+            // Try YouTube volume if available (best-effort)
+            try {
+                if (youTubePlayer != null) {
+                    int percent = (int)(v * 100f);
+                    java.lang.reflect.Method m = youTubePlayer.getClass().getMethod("setVolume", int.class);
+                    m.invoke(youTubePlayer, percent);
+                }
+            } catch (Throwable ignore) {}
+        } catch (Throwable t) {
+            Log.w(TAG, "setVolume failed", t);
+        }
+    }
+
+    private void onRestartClicked() {
+        if (!restartArmed) {
+            restartArmed = true;
+            seekTo(0);
+            if (progressHandler == null) progressHandler = new android.os.Handler(android.os.Looper.getMainLooper());
+            progressHandler.postDelayed(() -> restartArmed = false, 600);
+        } else {
+            restartArmed = false;
+            prevTrack();
+        }
+    }
+
+    private void seekTo(long ms) {
+        Track t = getCurrentTrack();
+        if (t == null) return;
+        if (t.type == Track.Type.FILE && mediaPlayer != null) {
+            try { mediaPlayer.seekTo((int) ms); } catch (Throwable ignore) {}
+        } else if (t.type == Track.Type.YOUTUBE && youTubePlayer != null) {
+            try { youTubePlayer.seekTo((float) (ms / 1000f)); } catch (Throwable ignore) {}
+        }
+    }
+
+    private void play() {
+        Track t = getCurrentTrack();
+        if (t == null) return;
+        if (t.type == Track.Type.FILE) {
+            if (mediaPlayer != null) {
+                if (mpPrepared) {
+                    try { mediaPlayer.start(); startProgressUpdates(); } catch (Throwable ignore) {}
+                } else {
+                    // Not prepared yet; play when ready
+                    mpPendingPlay = true;
+                }
+            } else {
+                loadTrack(currentTrackIndex, true);
+            }
+        } else {
+            if (youTubePlayer != null) {
+                try { youTubePlayer.play(); } catch (Throwable ignore) {}
+            } else {
+                // Ensure the current YouTube track is loaded and auto-play once ready
+                ytPendingPlay = true;
+                loadTrack(currentTrackIndex, true);
+            }
+        }
+    }
+
+    private void pause() {
+        try {
+            if (mediaPlayer != null && mediaPlayer.isPlaying()) mediaPlayer.pause();
+        } catch (Throwable ignore) {}
+        try {
+            if (youTubePlayer != null) youTubePlayer.pause();
+        } catch (Throwable ignore) {}
+        stopProgressUpdates();
+    }
+
+    private void startProgressUpdates() {
+        if (progressHandler == null) progressHandler = new android.os.Handler(android.os.Looper.getMainLooper());
+        progressHandler.removeCallbacks(progressRunnable);
+        progressHandler.post(progressRunnable);
+    }
+
+    private void stopProgressUpdates() {
+        if (progressHandler != null) progressHandler.removeCallbacks(progressRunnable);
+    }
+
+    private void updateProgressUi() {
+        Track t = getCurrentTrack();
+        if (t == null || timeSlider == null || trackTimeView == null) return;
+        if (t.type == Track.Type.FILE && mediaPlayer != null) {
+            int cur = 0; int dur = 0;
+            try { cur = mediaPlayer.getCurrentPosition(); } catch (Throwable ignore) {}
+            try { dur = mediaPlayer.getDuration(); } catch (Throwable ignore) {}
+            if (dur <= 0) dur = (int) Math.max(1, t.durationMs);
+            timeSlider.setValueTo(Math.max(1, dur));
+            timeSlider.setValue(cur);
+            trackTimeView.setText(formatTime(cur) + " / " + formatTime(dur));
+        }
+    }
+
+    private static String formatTime(long ms) {
+        long totalSec = ms / 1000L;
+        long min = totalSec / 60L;
+        long sec = totalSec % 60L;
+        return min + ":" + (sec < 10 ? "0" + sec : String.valueOf(sec));
+    }
+
+    private void prevTrack() {
+        if (playlist.isEmpty()) return;
+        currentTrackIndex = (currentTrackIndex - 1 + playlist.size()) % playlist.size();
+        loadTrack(currentTrackIndex, true);
+    }
+    private void nextTrack() {
+        if (playlist.isEmpty()) return;
+        currentTrackIndex = (currentTrackIndex + 1) % playlist.size();
+        loadTrack(currentTrackIndex, true);
+    }
+
+    private Track getCurrentTrack() {
+        if (currentTrackIndex < 0 || currentTrackIndex >= playlist.size()) return null;
+        return playlist.get(currentTrackIndex);
+    }
+
+    private void loadTrack(int index, boolean autoPlay) {
+        if (index < 0 || index >= playlist.size()) return;
+        currentTrackIndex = index;
+        Track t = playlist.get(index);
+
+        // Update title
+        if (trackNameView != null) trackNameView.setText(t.title != null ? t.title : "");
+
+        // Reset progress
+        if (timeSlider != null) { timeSlider.setValueFrom(0f); timeSlider.setValueTo(1f); timeSlider.setValue(0f); }
+        if (trackTimeView != null) trackTimeView.setText("0:00 / 0:00");
+
+        // Release previous
+        releaseMediaPlayer();
+
+        if (t.type == Track.Type.YOUTUBE) {
+            // Switch UI
+            if (youTubePlayerView != null) youTubePlayerView.setVisibility(View.VISIBLE);
+            if (audioArtwork != null) audioArtwork.setVisibility(View.GONE);
+            if (youTubePlayer != null) {
+                String videoId = extractYouTubeId(t.uri);
+                if (videoId != null) {
+                    try {
+                        youTubePlayer.cueVideo(videoId, 0f);
+                        if (autoPlay || ytPendingPlay) {
+                            ytPendingPlay = false;
+                            youTubePlayer.play();
+                        }
+                    } catch (Throwable ignore) {}
+                }
+            } else if (autoPlay) {
+                // Player not yet ready; remember to start on onReady
+                ytPendingPlay = true;
+            }
+        } else {
+            // FILE track
+            if (youTubePlayerView != null) youTubePlayerView.setVisibility(View.GONE);
+            if (audioArtwork != null) audioArtwork.setVisibility(View.VISIBLE);
+            try {
+                mpPrepared = false;
+                mpPendingPlay = false;
+                mediaPlayer = new MediaPlayer();
+                String src = t.uri;
+                try {
+                    Uri u = Uri.parse(src);
+                    String scheme = u != null ? u.getScheme() : null;
+                    if (scheme != null && (scheme.equalsIgnoreCase("content") || scheme.equalsIgnoreCase("file"))) {
+                        mediaPlayer.setDataSource(requireContext(), u);
+                    } else {
+                        File f = new File(src);
+                        if (f.exists()) {
+                            mediaPlayer.setDataSource(src);
+                        } else if (scheme == null && src != null && src.startsWith("/")) {
+                            mediaPlayer.setDataSource(src);
+                        } else {
+                            // Fallback: try as context URI
+                            mediaPlayer.setDataSource(requireContext(), u);
+                        }
+                    }
+                } catch (Throwable setDsErr) {
+                    Log.w(TAG, "Primary setDataSource failed, trying file fallback: " + src, setDsErr);
+                    try {
+                        File f2 = new File(src);
+                        if (f2.exists()) {
+                            mediaPlayer.setDataSource(src);
+                        }
+                    } catch (Throwable ignore2) {}
+                }
+                mediaPlayer.setOnPreparedListener(mp -> {
+                    try {
+                        mpPrepared = true;
+                        int dur = mp.getDuration();
+                        if (timeSlider != null) { timeSlider.setValueFrom(0f); timeSlider.setValueTo(Math.max(1, dur)); timeSlider.setValue(0f); }
+                        if (trackTimeView != null) trackTimeView.setText("0:00 / " + formatTime(dur));
+                        if (autoPlay || mpPendingPlay) {
+                            mpPendingPlay = false;
+                            mp.start();
+                            startProgressUpdates();
+                        }
+                    } catch (Throwable ignore) {}
+                });
+                mediaPlayer.setOnCompletionListener(mp -> stopProgressUpdates());
+                mediaPlayer.prepareAsync();
+            } catch (Throwable e) {
+                Log.e(TAG, "Failed to load audio: " + t.uri, e);
+            }
+        }
+    }
+
+    private void releaseMediaPlayer() {
+        try {
+            if (mediaPlayer != null) {
+                stopProgressUpdates();
+                mediaPlayer.reset();
+                mediaPlayer.release();
+            }
+        } catch (Throwable ignore) {}
+        mediaPlayer = null;
+    }
+
+    private boolean isYouTubeUrl(String s) {
+        if (s == null) return false;
+        String u = s.toLowerCase();
+        return u.contains("youtube.com/watch") || u.contains("youtu.be/");
+    }
+    private String extractYouTubeId(String url) {
+        if (url == null) return null;
+        try {
+            if (url.contains("youtu.be/")) {
+                String part = url.substring(url.indexOf("youtu.be/") + 9);
+                int q = part.indexOf('?');
+                return q >= 0 ? part.substring(0, q) : part;
+            }
+            int v = url.indexOf("v=");
+            if (v >= 0) {
+                String part = url.substring(v + 2);
+                int amp = part.indexOf('&');
+                return amp >= 0 ? part.substring(0, amp) : part;
+            }
+        } catch (Throwable ignore) {}
+        return null;
+    }
+
+    private void buildPlaylistFromAudioEntities(List<AudioEntity> list) {
+        playlist.clear();
+        if (list == null) return;
+        for (AudioEntity a : list) {
+            if (a == null) continue;
+            String uri = a.getUri();
+            String filePath = null;
+            try { filePath = a.getFilePath(); } catch (Throwable ignore) {}
+            // Prefer local copied file_path when available (more reliable than transient content URIs)
+            String source = null;
+            if (filePath != null && !filePath.trim().isEmpty()) {
+                File f = new File(filePath);
+                if (f.exists()) source = filePath;
+            }
+            if (source == null) {
+                // Fallback to original uri
+                if (uri != null && !uri.trim().isEmpty()) source = uri;
+            }
+            if (source == null) continue;
+
+            String name = a.getName();
+            if (name == null || name.trim().isEmpty()) {
+                // Derive a friendly display name from the source
+                try {
+                    Uri u = Uri.parse(source);
+                    String scheme = u != null ? u.getScheme() : null;
+                    if (scheme != null && (scheme.equalsIgnoreCase("content") || scheme.equalsIgnoreCase("file"))) {
+                        String last = u.getLastPathSegment();
+                        if (last != null && !last.trim().isEmpty()) name = last;
+                    }
+                } catch (Throwable ignore) {}
+                if (name == null || name.trim().isEmpty()) {
+                    try {
+                        java.io.File f = new java.io.File(source);
+                        String fn = f.getName();
+                        if (fn != null && !fn.trim().isEmpty()) name = fn;
+                    } catch (Throwable ignore) {}
+                }
+                if (name == null || name.trim().isEmpty()) name = source;
+            }
+            // Classify as YouTube vs local file
+            if (isYouTubeUrl(source)) {
+                playlist.add(new Track(Track.Type.YOUTUBE, name, source, 0));
+            } else {
+                long dur = 0;
+                try { dur = a.getDuration(); } catch (Throwable ignore) {}
+                playlist.add(new Track(Track.Type.FILE, name, source, dur));
+            }
+        }
+        currentTrackIndex = 0;
+    }
+
+    private void showBottomDialog() {
+        if (bottomPlayerContainer == null) return;
+        bottomPlayerContainer.setVisibility(View.VISIBLE);
+    }
+
+    private void hideBottomDialog() {
+        if (bottomPlayerContainer == null) return;
+        bottomPlayerContainer.setVisibility(View.GONE);
+    }
+
+    private boolean isBottomDialogVisible() {
+        return bottomPlayerContainer != null && bottomPlayerContainer.getVisibility() == View.VISIBLE;
+    }
+
+    private void stopPlayerIfPlaying() {
+        try {
+            if (youTubePlayer != null) {
+                youTubePlayer.pause();
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "stopPlayerIfPlaying: failed to pause YT", t);
+        }
+        try {
+            if (mediaPlayer != null && mediaPlayer.isPlaying()) {
+                mediaPlayer.pause();
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "stopPlayerIfPlaying: failed to pause MP", t);
+        }
+    }
+
     private void setupPageNavigation() {
         if (photoView == null) return;
+        // Keep OnViewTapListener as a fallback (fires when PhotoView recognizes a tap on the view)
 
-        // Calculate tap zone width in pixels for ~1.5 inches
-        final float zonePx = 1.5f * getResources().getDisplayMetrics().xdpi;
-
-        photoView.setOnViewTapListener(new OnViewTapListener() {
+        // Double-tap in the center area enters annotation mode
+        photoView.setOnDoubleTapListener(new GestureDetector.OnDoubleTapListener() {
             @Override
-            public void onViewTap(View view, float x, float y) {
+            public boolean onSingleTapConfirmed(MotionEvent e) {
                 int total = getTotalPageCount();
-                if (total <= 0) return;
+                if (total <= 0) return false;
 
-                int width = view.getWidth();
-                if (x <= zonePx) {
-                    // Left zone: previous page
+                int width = photoView.getWidth();
+                if (width <= 0) return false;
+
+                float centerStart = width / 3f;
+                float centerEnd = width * 2f / 3f;
+
+                if (e.getX() < centerStart) {
                     if (currentPage > 0) {
+                        Log.d(TAG, "Nav(FB): view tap left side -> prev page");
                         setCurrentPage(currentPage - 1);
                     }
-                } else if (x >= width - zonePx) {
-                    // Right zone: next page
+                } else if (e.getX() > centerEnd) {
                     if (currentPage < total - 1) {
+                        Log.d(TAG, "Nav(FB): view tap right side -> next page");
                         setCurrentPage(currentPage + 1);
                     }
                 } else {
-                    // Middle tap: do nothing (could toggle UI later)
-                    Log.d(TAG, "Middle area tapped; no navigation");
+                    Log.d(TAG, "Nav(FB): view tap center -> toggle UI");
+                    toggleUiChrome();
                 }
-            }
-        });
 
-        // Double-tap in the center area enters annotation mode
-        photoView.setOnDoubleTapListener(new android.view.GestureDetector.OnDoubleTapListener() {
-            @Override
-            public boolean onSingleTapConfirmed(android.view.MotionEvent e) {
-                return false; // let PhotoView handle single taps
+                return false;
             }
             @Override
             public boolean onDoubleTap(android.view.MotionEvent e) {
@@ -1101,16 +1643,18 @@ public class SheetDetailFragment extends Fragment {
                 if (w <= 0 || h <= 0) return false;
                 float x = e.getX();
                 float y = e.getY();
-                // Define center region as middle third of the view
                 float left = w / 3f;
                 float right = w * 2f / 3f;
                 float top = h / 3f;
                 float bottom = h * 2f / 3f;
                 if (x >= left && x <= right && y >= top && y <= bottom) {
+                    Log.d(TAG, "Nav: double-tap center -> enter annotation mode (hide bottom player and pause)");
+                    hideBottomDialog();
+                    stopPlayerIfPlaying();
                     enterAnnotationMode();
-                    return true; // consume to prevent default double-tap zoom
+                    return true;
                 }
-                return false; // allow default behavior elsewhere
+                return false;
             }
             @Override
             public boolean onDoubleTapEvent(android.view.MotionEvent e) {
@@ -1151,6 +1695,24 @@ public class SheetDetailFragment extends Fragment {
     @Override
     public void onDestroyView() {
         super.onDestroyView();
+        // Also clear static reference if pointing to this instance
+        try {
+            if (sLastInstanceRef != null && sLastInstanceRef.get() == this) {
+                sLastInstanceRef.clear();
+            }
+        } catch (Throwable ignore) {}
+        // Release YouTube player if present to avoid leaks and background work
+        try {
+            if (youTubePlayerView != null) {
+                youTubePlayerView.release();
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "onDestroyView: failed to release YouTubePlayerView", t);
+        } finally {
+            youTubePlayerView = null;
+            youTubePlayer = null;
+            bottomPlayerContainer = null; // will be re-inflated if needed next time
+        }
         synchronized (renderLock) {
             if (document != null) {
                 try { document.close(); } catch (IOException e) { Log.e(TAG, "Error closing document in onDestroyView", e); }

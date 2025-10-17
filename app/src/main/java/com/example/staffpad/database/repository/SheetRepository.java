@@ -160,11 +160,25 @@ public class SheetRepository {
                 String filePath = copyAudioFileToAppStorage(audioUri, filename);
                 long fileSize = new File(filePath).length();
 
-                // In a real app, you'd get actual duration
-                long duration = 0; // placeholder
-                String durationFormatted = "0:00"; // placeholder
+                // Extract duration using MediaMetadataRetriever on the copied file
+                long duration = 0L;
+                String durationFormatted = "0:00";
+                try {
+                    android.media.MediaMetadataRetriever mmr = new android.media.MediaMetadataRetriever();
+                    mmr.setDataSource(filePath);
+                    String durStr = mmr.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION);
+                    if (durStr != null) {
+                        duration = Long.parseLong(durStr);
+                        long m = (duration / 1000) / 60;
+                        long s = (duration / 1000) % 60;
+                        durationFormatted = m + ":" + (s < 10 ? ("0" + s) : String.valueOf(s));
+                    }
+                    mmr.release();
+                } catch (Throwable t) {
+                    Log.w("SheetRepository", "Failed to read audio duration: " + filePath, t);
+                }
 
-                // Create and insert audio entity
+                // Create and insert audio entity with real filename and duration
                 AudioEntity audioEntity = new AudioEntity(
                         sheetId,
                         filename,
@@ -184,12 +198,55 @@ public class SheetRepository {
 
     public void removeAudioFromSheet(long audioId) {
         executorService.execute(() -> {
-            // Get the audio file to delete its physical file
-            LiveData<AudioEntity> audioLiveData = audioDao.getAudioById(audioId);
-            // In a real app, you'd observe this LiveData and delete the file
+            try {
+                AudioEntity audio = audioDao.getAudioByIdSync(audioId);
+                if (audio != null) {
+                    String path = audio.getFilePath();
+                    if (path != null && !path.trim().isEmpty()) {
+                        try {
+                            File f = new File(path);
+                            if (f.exists()) {
+                                boolean deleted = f.delete();
+                                Log.d("SheetRepository", "Deleted audio file " + path + ": " + deleted);
+                            }
+                        } catch (Throwable t) {
+                            Log.w("SheetRepository", "Failed to delete audio file: " + path, t);
+                        }
+                    }
+                }
+                audioDao.deleteById(audioId);
+            } catch (Throwable t) {
+                Log.e("SheetRepository", "removeAudioFromSheet failed", t);
+            }
+        });
+    }
 
-            // Delete from database
-            // audioDao.deleteAudio(audio);
+    public void addAudioLinkToSheet(long sheetId, String url) {
+        executorService.execute(() -> {
+            try {
+                if (url == null) return;
+                String u = url.trim();
+                if (u.isEmpty()) return;
+                String low = u.toLowerCase();
+                boolean yt = low.contains("youtube.com/watch") || low.contains("youtu.be/");
+                if (!yt) {
+                    Log.w("SheetRepository", "Rejected non-YouTube URL: " + url);
+                    return;
+                }
+                int index = 1;
+                try { index = audioDao.countYouTubeLinksForSheet(sheetId) + 1; } catch (Throwable ignore) {}
+                String sheetName = "Sheet";
+                try {
+                    SheetEntity s = sheetDao.getSheetByIdSync(sheetId);
+                    if (s != null && s.getTitle() != null && !s.getTitle().trim().isEmpty()) sheetName = s.getTitle().trim();
+                } catch (Throwable ignore) {}
+                String safeName = sheetName.replaceAll("[\\\\/:*?\"<>|]", "_");
+                String displayName = safeName + "_Clip_" + index;
+                AudioEntity audio = new AudioEntity(sheetId, displayName, null, u, 0L, 0L, "0:00");
+                audioDao.insertAudio(audio);
+            } catch (Throwable t) {
+                Log.e("SheetRepository", "addAudioLinkToSheet failed", t);
+            }
         });
     }
 
@@ -204,9 +261,31 @@ public class SheetRepository {
 
     // Helper methods for file operations
     private String getFileNameFromUri(Uri uri) {
-        String result = uri.getLastPathSegment();
-        if (result != null && result.contains("/")) {
-            result = result.substring(result.lastIndexOf("/") + 1);
+        String result = null;
+        try {
+            if ("content".equalsIgnoreCase(uri.getScheme())) {
+                android.database.Cursor cursor = application.getContentResolver().query(uri, null, null, null, null);
+                if (cursor != null) {
+                    try {
+                        if (cursor.moveToFirst()) {
+                            int nameIndex = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME);
+                            if (nameIndex != -1) {
+                                result = cursor.getString(nameIndex);
+                            }
+                        }
+                    } finally {
+                        cursor.close();
+                    }
+                }
+            }
+        } catch (Throwable t) {
+            Log.w("SheetRepository", "DISPLAY_NAME query failed for uri: " + uri, t);
+        }
+        if (result == null || result.trim().isEmpty()) {
+            result = uri.getLastPathSegment();
+            if (result != null && result.contains("/")) {
+                result = result.substring(result.lastIndexOf('/') + 1);
+            }
         }
         return result != null ? result : "unknown_file";
     }

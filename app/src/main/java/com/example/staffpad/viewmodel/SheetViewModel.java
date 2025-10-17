@@ -152,6 +152,13 @@ public class SheetViewModel extends AndroidViewModel {
         repository.removeAudioFromSheet(audioId);
     }
 
+    public void addAudioLinkToSelectedSheet(String url) {
+        Long sheetId = selectedSheetId.getValue();
+        if (sheetId != null) {
+            repository.addAudioLinkToSheet(sheetId, url);
+        }
+    }
+
     // Helper methods for getting data for auto-complete
     public LiveData<List<String>> getAllComposers() {
         return repository.getAllComposers();

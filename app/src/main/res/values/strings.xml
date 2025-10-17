@@ -67,4 +67,8 @@
     <string name="name">Name</string>
     <string name="brightness_0">Brightness: 0</string>
     <string name="contrast_1_00">Contrast: 1.00</string>
+    <string name="restore">Restore</string>
+    <string name="align_0">Align: 0°</string>
+    <string name="rotate_left">Rotate Left</string>
+    <string name="name_placeholder">Name Placeholder</string>
 </resources>

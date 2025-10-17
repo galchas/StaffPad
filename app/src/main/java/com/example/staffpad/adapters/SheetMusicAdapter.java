@@ -82,6 +82,8 @@ public class SheetMusicAdapter extends RecyclerView.Adapter<SheetMusicAdapter.Sh
             viewModel.updateSheet(updatedEntity);
         });
 
+        // Pause any playback before showing metadata dialog per requirements
+        try { com.example.staffpad.SheetDetailFragment.requestPausePlayback(); } catch (Throwable ignore) {}
         // Show the dialog
         dialog.show(((AppCompatActivity)view.getContext()).getSupportFragmentManager(), "metadata_dialog");
     }

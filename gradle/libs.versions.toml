@@ -12,8 +12,10 @@ navVersion = "2.9.5"
 pdfboxAndroid = "2.0.27.0"
 photoview = "2.3.0"
 roomVersion = "2.8.2"
+androidyoutubeplayer = "13.0.0"
 
 [libraries]
+androidyoutubeplayercore = { module = "com.pierfrancescosoffritti.androidyoutubeplayer:core", version.ref = "androidyoutubeplayer" }
 colorpickerview = { module = "com.github.skydoves:colorpickerview", version.ref = "colorpickerview" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 ext-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }
@@ -34,4 +36,3 @@ room-runtime = { module = "androidx.room:room-runtime", version.ref = "roomVersi
 room-testing = { module = "androidx.room:room-testing", version.ref = "roomVersion" }
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
-

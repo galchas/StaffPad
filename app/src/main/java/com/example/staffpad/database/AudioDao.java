@@ -21,14 +21,26 @@ public interface AudioDao {
     @Delete
     void deleteAudio(AudioEntity audio);
 
+    // LiveData fetch (UI observe)
     @Query("SELECT * FROM audio_files WHERE id = :id")
     LiveData<AudioEntity> getAudioById(long id);
+
+    // Synchronous fetch (repository background thread)
+    @Query("SELECT * FROM audio_files WHERE id = :id")
+    AudioEntity getAudioByIdSync(long id);
+
+    // Delete by id (no need to load entity)
+    @Query("DELETE FROM audio_files WHERE id = :id")
+    void deleteById(long id);
 
     @Query("SELECT * FROM audio_files WHERE sheet_id = :sheetId ORDER BY name ASC")
     LiveData<List<AudioEntity>> getAudioFilesForSheet(long sheetId);
 
     @Query("SELECT COUNT(*) FROM audio_files WHERE sheet_id = :sheetId")
     int getAudioCountForSheet(long sheetId);
+
+    @Query("SELECT COUNT(*) FROM audio_files WHERE sheet_id = :sheetId AND (uri LIKE '%youtube.com/watch%' OR uri LIKE '%youtu.be/%')")
+    int countYouTubeLinksForSheet(long sheetId);
 
     @Query("DELETE FROM audio_files WHERE sheet_id = :sheetId")
     void deleteAllAudioForSheet(long sheetId);
