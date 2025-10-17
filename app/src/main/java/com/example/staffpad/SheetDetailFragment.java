@@ -1394,6 +1394,15 @@ public class SheetDetailFragment extends Fragment {
         return playlist.get(currentTrackIndex);
     }
 
+    private void stopYouTubeIfPlaying() {
+        try {
+            if (youTubePlayer != null) {
+                youTubePlayer.pause();
+            }
+        } catch (Throwable ignore) {}
+        ytPendingPlay = false;
+    }
+
     private void loadTrack(int index, boolean autoPlay) {
         if (index < 0 || index >= playlist.size()) return;
         currentTrackIndex = index;
@@ -1406,13 +1415,19 @@ public class SheetDetailFragment extends Fragment {
         if (timeSlider != null) { timeSlider.setValueFrom(0f); timeSlider.setValueTo(1f); timeSlider.setValue(0f); }
         if (trackTimeView != null) trackTimeView.setText("0:00 / 0:00");
 
-        // Release previous
-        releaseMediaPlayer();
+        // Always stop the other engine before starting a new track
+        if (t.type == Track.Type.YOUTUBE) {
+            // Stop local audio engine
+            releaseMediaPlayer();
+        } else {
+            // Stop YouTube engine to ensure no overlap
+            stopYouTubeIfPlaying();
+        }
 
         if (t.type == Track.Type.YOUTUBE) {
-            // Switch UI
-            if (youTubePlayerView != null) youTubePlayerView.setVisibility(View.VISIBLE);
-            if (audioArtwork != null) audioArtwork.setVisibility(View.GONE);
+            // Per requirement: keep YouTube view hidden and show artwork instead
+            if (youTubePlayerView != null) youTubePlayerView.setVisibility(View.GONE);
+            if (audioArtwork != null) audioArtwork.setVisibility(View.VISIBLE);
             if (youTubePlayer != null) {
                 String videoId = extractYouTubeId(t.uri);
                 if (videoId != null) {
