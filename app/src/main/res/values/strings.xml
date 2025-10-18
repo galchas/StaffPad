@@ -78,4 +78,5 @@
     <string name="reset_button">Reset Button</string>
     <string name="play_button">Play Button</string>
     <string name="pause_button">Pause Button</string>
+    <string name="tool_icon">tool icon</string>
 </resources>

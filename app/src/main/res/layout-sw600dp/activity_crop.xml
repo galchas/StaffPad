@@ -73,7 +73,8 @@
 
             <com.google.android.material.slider.Slider
                 android:id="@+id/rotation_slider"
-                style="@style/Widget.Material3.Slider"
+                style="@style/Widget.MaterialComponents.Slider"
+                app:labelBehavior="gone"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
@@ -111,7 +112,8 @@
 
         <com.google.android.material.slider.Slider
             android:id="@+id/brightness_slider"
-            style="@style/Widget.Material3.Slider"
+            style="@style/Widget.MaterialComponents.Slider"
+            app:labelBehavior="gone"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:valueFrom="-100"
@@ -132,7 +134,8 @@
 
         <com.google.android.material.slider.Slider
             android:id="@+id/contrast_slider"
-            style="@style/Widget.Material3.Slider"
+            style="@style/Widget.MaterialComponents.Slider"
+            app:labelBehavior="gone"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:valueFrom="0.5"

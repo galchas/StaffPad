@@ -1158,7 +1158,7 @@ public class MainActivity extends AppCompatActivity {
         BookmarkAdapter bookmarkAdapter = new BookmarkAdapter(bookmarkItems);
         bookmarksRecyclerView.setAdapter(bookmarkAdapter);
 
-        toolsRecyclerView.setLayoutManager(new GridLayoutManager(this, 3));
+        toolsRecyclerView.setLayoutManager(new LinearLayoutManager(this));
         List<ToolItem> toolItems = getToolItems();
         ToolAdapter toolAdapter = new ToolAdapter(toolItems);
 
@@ -1186,8 +1186,26 @@ public class MainActivity extends AppCompatActivity {
                 case "Rearrange":
                     Toast.makeText(this, "Rearrange pages coming soon", Toast.LENGTH_SHORT).show();
                     break;
-                case "Backup":
-                    Toast.makeText(this, "Backup feature coming soon", Toast.LENGTH_SHORT).show();
+                case "Share":
+                    Toast.makeText(this, "Share coming soon", Toast.LENGTH_SHORT).show();
+                    break;
+                case "Templates":
+                    Toast.makeText(this, "Templates coming soon", Toast.LENGTH_SHORT).show();
+                    break;
+                case "Scan":
+                    Toast.makeText(this, "Scan coming soon", Toast.LENGTH_SHORT).show();
+                    break;
+                case "ABC Notations":
+                    Toast.makeText(this, "ABC editor coming soon", Toast.LENGTH_SHORT).show();
+                    break;
+                case "Piano":
+                    Toast.makeText(this, "Piano coming soon", Toast.LENGTH_SHORT).show();
+                    break;
+                case "Recorder":
+                    Toast.makeText(this, "Recorder coming soon", Toast.LENGTH_SHORT).show();
+                    break;
+                case "Backup & Restore":
+                    Toast.makeText(this, "Backup & Restore coming soon", Toast.LENGTH_SHORT).show();
                     break;
                 case "Settings":
                     Toast.makeText(this, "Settings coming soon", Toast.LENGTH_SHORT).show();
@@ -1286,6 +1304,9 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
 
+        // Per requirement: dismiss player and stop all its activities before entering Crop
+        try { fragment.dismissAndStopPlayer(); } catch (Throwable ignore) {}
+
         long currentSheetId = fragment.getSheetId();
 
         if (currentSheetId == -1) {
@@ -1351,12 +1372,28 @@ public class MainActivity extends AppCompatActivity {
 
     private List<ToolItem> getToolItems() {
         List<ToolItem> items = new ArrayList<>();
-        items.add(new ToolItem("Layers", R.drawable.baseline_format_list_bulleted_24)); // NEW
-        items.add(new ToolItem("Crop", R.drawable.ic_crop));
-        items.add(new ToolItem("Annotate", R.drawable.round_edit_note_24));
-        items.add(new ToolItem("Rearrange", R.drawable.round_edit_note_24));
-        items.add(new ToolItem("Backup", R.drawable.round_home_24));
-        items.add(new ToolItem("Settings", R.drawable.ic_info));
+
+        // Group: Edit Sheet
+        items.add(new ToolItem("Edit Sheet"));
+        items.add(new ToolItem("Annotate", android.R.drawable.ic_menu_edit));
+        items.add(new ToolItem("Crop", android.R.drawable.ic_menu_crop));
+        items.add(new ToolItem("Layers", R.drawable.baseline_format_list_bulleted_24));
+        items.add(new ToolItem("Rearrange", android.R.drawable.ic_menu_sort_alphabetically));
+        items.add(new ToolItem("Share", android.R.drawable.ic_menu_share));
+
+        // Group: Add Sheet
+        items.add(new ToolItem("Add Sheet"));
+        items.add(new ToolItem("Templates", android.R.drawable.ic_menu_gallery));
+        items.add(new ToolItem("Scan", android.R.drawable.ic_menu_camera));
+        items.add(new ToolItem("ABC Notations", R.drawable.ic_abc));
+
+        // Group: More Tools
+        items.add(new ToolItem("More Tools"));
+        items.add(new ToolItem("Piano", R.drawable.baseline_piano_24));
+        items.add(new ToolItem("Recorder", android.R.drawable.ic_btn_speak_now));
+        items.add(new ToolItem("Backup & Restore", android.R.drawable.ic_menu_save));
+        items.add(new ToolItem("Settings", android.R.drawable.ic_menu_preferences));
+
         return items;
     }
     private void toggleSidebar(String sidebarName) {

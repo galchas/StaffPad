@@ -1172,6 +1172,18 @@ public class SheetDetailFragment extends Fragment {
         }
     }
 
+    private void ensureToolbarVisible() {
+        try {
+            androidx.fragment.app.FragmentActivity act = requireActivity();
+            View toolbar = act.findViewById(R.id.app_toolbar);
+            if (toolbar != null && toolbar.getVisibility() != View.VISIBLE) {
+                toolbar.setVisibility(View.VISIBLE);
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "ensureToolbarVisible: failed", t);
+        }
+    }
+
     private void inflateBottomPlayerIfNeeded() {
         if (bottomPlayerContainer != null) return; // already inflated
         try {
@@ -1285,6 +1297,56 @@ public class SheetDetailFragment extends Fragment {
                     volumeSlider.addOnChangeListener((s, value, fromUser) -> setVolume(value / 100f));
                 }
             }
+
+                // Enable drag-to-dismiss from the top 60dp area
+                if (bottomPlayerContainer != null) {
+                    final float density = getResources().getDisplayMetrics().density;
+                    final float grabHeightPx = 60f * density;
+                    final float fallbackDismissPx = 120f * density;
+                    bottomPlayerContainer.setOnTouchListener(new View.OnTouchListener() {
+                        float downRawY = 0f;
+                        float startTranslationY = 0f;
+                        boolean dragging = false;
+                        @Override public boolean onTouch(View v, MotionEvent e) {
+                            switch (e.getActionMasked()) {
+                                case MotionEvent.ACTION_DOWN:
+                                    // Only start potential drag if touch is within the top 20dp strip
+                                    if (e.getY() <= grabHeightPx) {
+                                        downRawY = e.getRawY();
+                                        startTranslationY = v.getTranslationY();
+                                        dragging = true;
+                                        return true;
+                                    }
+                                    return false;
+                                case MotionEvent.ACTION_MOVE:
+                                    if (!dragging) return false;
+                                    float dy = e.getRawY() - downRawY;
+                                    float newTrans = Math.max(0f, startTranslationY + dy);
+                                    v.setTranslationY(newTrans);
+                                    return true;
+                                case MotionEvent.ACTION_UP:
+                                case MotionEvent.ACTION_CANCEL:
+                                    if (!dragging) return false;
+                                    dragging = false;
+                                    float currentTrans = v.getTranslationY();
+                                    int h = v.getHeight();
+                                    float threshold = h > 0 ? (h * 0.25f) : fallbackDismissPx;
+                                    if (currentTrans > threshold) {
+                                        // Dismiss: animate off-screen then hide and reset translation
+                                        v.animate().translationY(h > 0 ? h : (currentTrans + fallbackDismissPx)).setDuration(150).withEndAction(() -> {
+                                            v.setVisibility(View.GONE);
+                                            v.setTranslationY(0f);
+                                        }).start();
+                                    } else {
+                                        // Snap back
+                                        v.animate().translationY(0f).setDuration(150).start();
+                                    }
+                                    return true;
+                            }
+                            return false;
+                        }
+                    });
+                }
         } catch (Throwable t) {
             Log.w(TAG, "inflateBottomPlayerIfNeeded: failed to inflate bottom player", t);
         }
@@ -1648,12 +1710,26 @@ public class SheetDetailFragment extends Fragment {
 
     private void showBottomDialog() {
         if (bottomPlayerContainer == null) return;
+        // Ensure app bar is visible when showing the player
+        ensureToolbarVisible();
+        bottomPlayerContainer.setTranslationY(0f);
         bottomPlayerContainer.setVisibility(View.VISIBLE);
     }
 
     private void hideBottomDialog() {
         if (bottomPlayerContainer == null) return;
         bottomPlayerContainer.setVisibility(View.GONE);
+    }
+
+    public void dismissAndStopPlayer() {
+        // Stop any ongoing playback activities and hide the UI
+        try { stopYouTubeIfPlaying(); } catch (Throwable ignore) {}
+        try { releaseMediaPlayer(); } catch (Throwable ignore) {}
+        try { stopProgressUpdates(); } catch (Throwable ignore) {}
+        mpPendingPlay = false;
+        mpPrepared = false;
+        ytPendingPlay = false;
+        hideBottomDialog();
     }
 
     private boolean isBottomDialogVisible() {
