@@ -86,6 +86,7 @@ public class SheetDetailFragment extends Fragment {
         }
     };
     private View audioArtwork;
+    private View youtubeLoading;
     private boolean restartArmed = false; // for double-click behavior on restart
     // Playback readiness flags to handle Play pressed before player is ready
     private boolean mpPrepared = false;
@@ -1192,6 +1193,7 @@ public class SheetDetailFragment extends Fragment {
                 timeSlider = inflated.findViewById(R.id.sliderTime);
                 volumeSlider = inflated.findViewById(R.id.volumeSlider);
                 audioArtwork = inflated.findViewById(R.id.audioArtwork);
+                youtubeLoading = inflated.findViewById(R.id.youtubeLoading);
 
                 // Wire YouTube player
                 youTubePlayerView = inflated.findViewById(R.id.youTunePlayer);
@@ -1217,6 +1219,8 @@ public class SheetDetailFragment extends Fragment {
                                     } catch (Throwable ignore) {}
                                 }
                             }
+                            // Hide loading once player is ready (will also be handled by state changes)
+                            if (youtubeLoading != null) youtubeLoading.setVisibility(View.GONE);
                         }
                         @Override
                         public void onCurrentSecond(com.pierfrancescosoffritti.androidyoutubeplayer.core.player.YouTubePlayer youTubePlayer, float second) {
@@ -1227,6 +1231,30 @@ public class SheetDetailFragment extends Fragment {
                         public void onVideoDuration(com.pierfrancescosoffritti.androidyoutubeplayer.core.player.YouTubePlayer youTubePlayer, float duration) {
                             ytDuration = duration;
                             updateYouTubeProgress(ytCurrent, ytDuration);
+                        }
+                        @Override
+                        public void onStateChange(com.pierfrancescosoffritti.androidyoutubeplayer.core.player.YouTubePlayer youTubePlayer,
+                                                  com.pierfrancescosoffritti.androidyoutubeplayer.core.player.PlayerConstants.PlayerState state) {
+                            // Toggle loading indicator based on buffering/playing states
+                            if (youtubeLoading == null) return;
+                            switch (state) {
+                                case BUFFERING:
+                                    youtubeLoading.setVisibility(View.VISIBLE);
+                                    break;
+                                case PLAYING:
+                                case PAUSED:
+                                case ENDED:
+                                case VIDEO_CUED:
+                                    youtubeLoading.setVisibility(View.GONE);
+                                    break;
+                                default:
+                                    break;
+                            }
+                        }
+                        @Override
+                        public void onError(com.pierfrancescosoffritti.androidyoutubeplayer.core.player.YouTubePlayer youTubePlayer,
+                                            com.pierfrancescosoffritti.androidyoutubeplayer.core.player.PlayerConstants.PlayerError error) {
+                            if (youtubeLoading != null) youtubeLoading.setVisibility(View.GONE);
                         }
                     });
                 }
@@ -1378,6 +1406,28 @@ public class SheetDetailFragment extends Fragment {
         return min + ":" + (sec < 10 ? "0" + sec : String.valueOf(sec));
     }
 
+    // Network connectivity check for YouTube loading
+    private boolean isNetworkAvailable() {
+        try {
+            android.content.Context ctx = requireContext().getApplicationContext();
+            android.net.ConnectivityManager cm = (android.net.ConnectivityManager) ctx.getSystemService(android.content.Context.CONNECTIVITY_SERVICE);
+            if (cm == null) return false;
+            if (android.os.Build.VERSION.SDK_INT >= 23) {
+                android.net.Network n = cm.getActiveNetwork();
+                if (n == null) return false;
+                android.net.NetworkCapabilities caps = cm.getNetworkCapabilities(n);
+                return caps != null && (caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_CELLULAR)
+                        || caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI)
+                        || caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_ETHERNET));
+            } else {
+                android.net.NetworkInfo ni = cm.getActiveNetworkInfo();
+                return ni != null && ni.isConnected();
+            }
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
     private void prevTrack() {
         if (playlist.isEmpty()) return;
         currentTrackIndex = (currentTrackIndex - 1 + playlist.size()) % playlist.size();
@@ -1428,6 +1478,18 @@ public class SheetDetailFragment extends Fragment {
             // Per requirement: keep YouTube view hidden and show artwork instead
             if (youTubePlayerView != null) youTubePlayerView.setVisibility(View.GONE);
             if (audioArtwork != null) audioArtwork.setVisibility(View.VISIBLE);
+
+            // Check connectivity before attempting to load YouTube
+            if (!isNetworkAvailable()) {
+                try { android.widget.Toast.makeText(requireContext(), "No internet connection", android.widget.Toast.LENGTH_SHORT).show(); } catch (Throwable ignore) {}
+                ytPendingPlay = false;
+                if (youtubeLoading != null) youtubeLoading.setVisibility(View.GONE);
+                return;
+            }
+
+            // Show loading indicator while we cue/play
+            if (youtubeLoading != null) youtubeLoading.setVisibility(View.VISIBLE);
+
             if (youTubePlayer != null) {
                 String videoId = extractYouTubeId(t.uri);
                 if (videoId != null) {

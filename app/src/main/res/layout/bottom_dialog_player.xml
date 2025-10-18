@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:background="@color/white"
@@ -21,7 +20,8 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
             android:text="@string/name_placeholder"
-            android:textSize="20sp" />
+            android:textSize="20sp"
+            android:textStyle="bold"/>
 
         <TextView
             android:id="@+id/trackTime"
@@ -29,7 +29,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
             android:layout_marginBottom="10dp"
-            android:text="0:00 / 2:30"
+            android:text="@string/time_placeholder"
             android:textSize="20sp" />
     </LinearLayout>
     <ImageView
@@ -38,6 +38,10 @@
         android:layout_height="40dp"
         android:layout_marginStart="16dp"
         android:layout_marginTop="112dp"
+        android:clickable="true"
+        android:focusable="true"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:contentDescription="@string/previous_track"
         android:src="@drawable/round_arrow_back_ios_24"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent"
@@ -60,11 +64,26 @@
         android:layout_height="100dp"
         android:layout_marginStart="72dp"
         android:layout_marginTop="84dp"
+        android:contentDescription="@string/artwork"
         android:scaleType="fitCenter"
-        android:src="@drawable/round_play_arrow_24"
+        android:src="@drawable/artwork"
+        android:baseline="1dp"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent"
         app:tint="#625E5F" />
+
+    <!-- Loading indicator shown while YouTube track is buffering/loading -->
+    <ProgressBar
+        android:id="@+id/youtubeLoading"
+        style="?android:attr/progressBarStyleSmall"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:indeterminate="true"
+        android:visibility="gone"
+        app:layout_constraintStart_toStartOf="@id/audioArtwork"
+        app:layout_constraintTop_toTopOf="@id/audioArtwork"
+        app:layout_constraintEnd_toEndOf="@id/audioArtwork"
+        app:layout_constraintBottom_toBottomOf="@id/audioArtwork"/>
 
     <com.google.android.material.slider.Slider
         android:id="@+id/sliderTracks"
@@ -73,6 +92,11 @@
         android:layout_height="wrap_content"
         android:layout_marginStart="60dp"
         app:labelBehavior="gone"
+        app:trackStopIndicatorSize="5dp"
+        app:trackHeight="10dp"
+        app:tickColor="@color/slider_tick_color"
+        app:thumbColor="@color/slider_thumb_color"
+        app:trackColor="@color/slider_track_color"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/audioArtwork" />
 
@@ -82,6 +106,10 @@
         android:layout_height="40dp"
         android:layout_marginStart="16dp"
         android:layout_marginTop="112dp"
+        android:clickable="true"
+        android:focusable="true"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:contentDescription="@string/next_track"
         android:src="@drawable/round_arrow_forward_ios_24"
         app:layout_constraintStart_toEndOf="@+id/audioArtwork"
         app:layout_constraintTop_toTopOf="parent"
@@ -93,13 +121,18 @@
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_margin="40dp"
+        android:layout_marginStart="60dp"
         android:layout_marginTop="30dp"
+        android:layout_marginEnd="60dp"
         android:layout_marginBottom="16dp"
         app:labelBehavior="gone"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="@+id/sliderTracks" />
+        app:layout_constraintTop_toTopOf="@+id/sliderTracks"
+        app:thumbColor="@color/slider_thumb_color"
+        app:trackColor="@color/slider_track_color"
+        app:trackHeight="10dp" />
 
     <LinearLayout
         android:id="@+id/linearLayout"
@@ -122,6 +155,8 @@
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="20dp"
                 app:labelBehavior="gone"
+                app:thumbColor="@color/slider_thumb_color"
+                app:trackColor="@color/slider_track_color"
                 app:layout_constraintBottom_toBottomOf="parent"
                 app:layout_constraintEnd_toEndOf="parent"
                 app:layout_constraintStart_toStartOf="parent" />
@@ -137,14 +172,22 @@
                 android:id="@+id/btnRestart"
                 android:layout_width="50dp"
                 android:layout_height="50dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/reset_button"
                 android:src="@drawable/round_fast_rewind_24"
                 app:tint="#8B8F90" />
 
             <ImageView
                 android:id="@+id/btnPlay"
-                android:layout_width="50dp"
+                android:layout_width="0dp"
                 android:layout_height="50dp"
                 android:layout_weight="1"
+                android:clickable="true"
+                android:focusable="true"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/play_button"
                 android:src="@drawable/round_play_arrow_24"
                 app:tint="#8B8F90" />
 
@@ -152,7 +195,11 @@
                 android:id="@+id/btnPause"
                 android:layout_width="50dp"
                 android:layout_height="50dp"
+                android:contentDescription="@string/pause_button"
+                android:clickable="true"
+                android:focusable="true"
                 android:src="@drawable/round_pause_24"
+                android:background="?attr/selectableItemBackgroundBorderless"
                 app:tint="#8B8F90" />
         </LinearLayout>
 

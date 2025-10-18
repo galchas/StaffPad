@@ -7,4 +7,7 @@
     <color name="teal_700">#FF018786</color>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+    <color name="slider_track_color">#D1CDCD</color>
+    <color name="slider_thumb_color">#4CAF50</color>
+    <color name="slider_tick_color">#72875A</color>
 </resources>

@@ -71,4 +71,11 @@
     <string name="align_0">Align: 0°</string>
     <string name="rotate_left">Rotate Left</string>
     <string name="name_placeholder">Name Placeholder</string>
+    <string name="time_placeholder">0:00 / 0:00</string>
+    <string name="previous_track">previous track</string>
+    <string name="artwork">ArtWork</string>
+    <string name="next_track">Next Track</string>
+    <string name="reset_button">Reset Button</string>
+    <string name="play_button">Play Button</string>
+    <string name="pause_button">Pause Button</string>
 </resources>
