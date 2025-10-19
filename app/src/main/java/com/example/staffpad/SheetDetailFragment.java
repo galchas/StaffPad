@@ -2377,6 +2377,269 @@ public class SheetDetailFragment extends Fragment {
         return sheetId;
     }
 
+    public enum ShareVariant { ORIGINAL, CROPPED, CROPPED_ANNOTATED }
+
+    public void exportCurrentPageBitmap(final ShareVariant variant, final java.util.function.Consumer<android.graphics.Bitmap> callback) {
+        new Thread(() -> {
+            try {
+                if (currentPdfFile == null) {
+                    runOnUiThread(() -> callback.accept(null));
+                    return;
+                }
+                int logical = currentPage;
+                int original = mapLogicalToOriginal(logical);
+                float scale = (!androidRendererOnly && renderer != null) ? getPdfBoxRenderScale() : getAndroidRenderScale();
+                android.graphics.Bitmap baseBitmap;
+                try {
+                    synchronized (renderLock) {
+                        baseBitmap = renderer != null ? renderer.renderImage(original, scale) : null;
+                    }
+                } catch (OutOfMemoryError oom) {
+                    Log.e(TAG, "exportCurrentPageBitmap: PdfBox render OOM; using Android PdfRenderer", oom);
+                    if (currentPdfFile != null) switchToAndroidRendererOnly(currentPdfFile);
+                    baseBitmap = renderWithAndroidPdfRenderer(currentPdfFile, original, getAndroidRenderScale());
+                } catch (Throwable t) {
+                    Log.e(TAG, "exportCurrentPageBitmap: PdfBox render failed; using Android PdfRenderer", t);
+                    if (currentPdfFile != null) switchToAndroidRendererOnly(currentPdfFile);
+                    baseBitmap = renderWithAndroidPdfRenderer(currentPdfFile, original, getAndroidRenderScale());
+                }
+
+                if (baseBitmap == null) {
+                    runOnUiThread(() -> callback.accept(null));
+                    return;
+                }
+
+                android.graphics.Bitmap working = baseBitmap;
+
+                if (variant != ShareVariant.ORIGINAL) {
+                    AppDatabase db = AppDatabase.getDatabase(requireContext().getApplicationContext());
+                    try {
+                        PageSettingsEntity settings = db.pageSettingsDao().getByPage(currentSheetId, original);
+                        if (settings != null) {
+                            if (settings.getRotation() != 0f) {
+                                working = applyRotation(working, settings.getRotation());
+                            }
+                            if (!(Math.abs(settings.getCropLeft()) < 1e-3 && Math.abs(settings.getCropTop()) < 1e-3 && Math.abs(settings.getCropRight() - 1f) < 1e-3 && Math.abs(settings.getCropBottom() - 1f) < 1e-3)) {
+                                PageLayerEntity tmp = new PageLayerEntity(currentSheetId, original, "__virtual_crop__", "CROP");
+                                tmp.setCropLeft(settings.getCropLeft());
+                                tmp.setCropTop(settings.getCropTop());
+                                tmp.setCropRight(settings.getCropRight());
+                                tmp.setCropBottom(settings.getCropBottom());
+                                working = applyCrop(working, tmp);
+                            }
+                            if (settings.getBrightness() != 0f || Math.abs(settings.getContrast() - 1f) > 1e-3) {
+                                applyAdjustmentsInPlace(working, settings.getBrightness(), settings.getContrast());
+                            }
+                        }
+                    } catch (Throwable t) {
+                        Log.w(TAG, "exportCurrentPageBitmap: failed to apply page settings", t);
+                    }
+
+                    try {
+                        PageLayerEntity cropLayer = db.pageLayerDao().getLatestCropLayerForPage(currentSheetId, original);
+                        if (cropLayer != null && cropLayer.hasCrop()) {
+                            working = applyCrop(working, cropLayer);
+                        }
+                    } catch (Throwable t) {
+                        Log.w(TAG, "exportCurrentPageBitmap: failed to apply crop layer", t);
+                    }
+                }
+
+                if (variant == ShareVariant.CROPPED_ANNOTATED) {
+                    try {
+                        PageLayerEntity ann = AppDatabase.getDatabase(requireContext().getApplicationContext())
+                                .pageLayerDao().getActiveAnnotationLayer(currentSheetId, original);
+                        if (ann != null) {
+                            String path = ann.getLayerImagePath();
+                            if (path != null && !path.isEmpty()) {
+                                android.graphics.Bitmap overlay = android.graphics.BitmapFactory.decodeFile(path);
+                                if (overlay != null) {
+                                    android.graphics.Canvas canvas = new android.graphics.Canvas(working);
+                                    if (overlay.getWidth() != working.getWidth() || overlay.getHeight() != working.getHeight()) {
+                                        android.graphics.Bitmap scaled = android.graphics.Bitmap.createScaledBitmap(overlay, working.getWidth(), working.getHeight(), true);
+                                        canvas.drawBitmap(scaled, 0, 0, null);
+                                        if (scaled != overlay) scaled.recycle();
+                                        overlay.recycle();
+                                    } else {
+                                        canvas.drawBitmap(overlay, 0, 0, null);
+                                        overlay.recycle();
+                                    }
+                                }
+                            }
+                        }
+                    } catch (Throwable t) {
+                        Log.w(TAG, "exportCurrentPageBitmap: failed to overlay annotation", t);
+                    }
+                }
+
+                android.graphics.Bitmap result = working;
+                runOnUiThread(() -> callback.accept(result));
+            } catch (Throwable t) {
+                Log.e(TAG, "exportCurrentPageBitmap failed", t);
+                runOnUiThread(() -> callback.accept(null));
+            }
+        }).start();
+    }
+
+    public void exportFullSheetPdf(final ShareVariant variant, final java.util.function.Consumer<java.io.File> callback) {
+        new Thread(() -> {
+            com.tom_roush.pdfbox.pdmodel.PDDocument outDoc = null;
+            try {
+                if (currentPdfFile == null) {
+                    runOnUiThread(() -> callback.accept(null));
+                    return;
+                }
+                int total = getTotalPageCount();
+                if (total <= 0) {
+                    runOnUiThread(() -> callback.accept(null));
+                    return;
+                }
+                outDoc = new com.tom_roush.pdfbox.pdmodel.PDDocument();
+
+                for (int logical = 0; logical < total; logical++) {
+                    int original = mapLogicalToOriginal(logical);
+                    float scale = (!androidRendererOnly && renderer != null) ? getPdfBoxRenderScale() : getAndroidRenderScale();
+                    android.graphics.Bitmap baseBitmap;
+                    try {
+                        synchronized (renderLock) {
+                            baseBitmap = renderer != null ? renderer.renderImage(original, scale) : null;
+                        }
+                    } catch (OutOfMemoryError oom) {
+                        android.util.Log.e(TAG, "exportFullSheetPdf: PdfBox render OOM; using Android PdfRenderer", oom);
+                        if (currentPdfFile != null) switchToAndroidRendererOnly(currentPdfFile);
+                        baseBitmap = renderWithAndroidPdfRenderer(currentPdfFile, original, getAndroidRenderScale());
+                    } catch (Throwable t) {
+                        android.util.Log.e(TAG, "exportFullSheetPdf: PdfBox render failed; using Android PdfRenderer", t);
+                        if (currentPdfFile != null) switchToAndroidRendererOnly(currentPdfFile);
+                        baseBitmap = renderWithAndroidPdfRenderer(currentPdfFile, original, getAndroidRenderScale());
+                    }
+
+                    if (baseBitmap == null) continue; // skip page on failure
+
+                    android.graphics.Bitmap working = baseBitmap;
+
+                    if (variant != ShareVariant.ORIGINAL) {
+                        AppDatabase db = AppDatabase.getDatabase(requireContext().getApplicationContext());
+                        try {
+                            PageSettingsEntity settings = db.pageSettingsDao().getByPage(currentSheetId, original);
+                            if (settings != null) {
+                                if (settings.getRotation() != 0f) {
+                                    android.graphics.Bitmap rotated = applyRotation(working, settings.getRotation());
+                                    if (working != baseBitmap && working != rotated && !working.isRecycled()) working.recycle();
+                                    working = rotated;
+                                }
+                                if (!(Math.abs(settings.getCropLeft()) < 1e-3 && Math.abs(settings.getCropTop()) < 1e-3 && Math.abs(settings.getCropRight() - 1f) < 1e-3 && Math.abs(settings.getCropBottom() - 1f) < 1e-3)) {
+                                    PageLayerEntity tmp = new PageLayerEntity(currentSheetId, original, "__virtual_crop__", "CROP");
+                                    tmp.setCropLeft(settings.getCropLeft());
+                                    tmp.setCropTop(settings.getCropTop());
+                                    tmp.setCropRight(settings.getCropRight());
+                                    tmp.setCropBottom(settings.getCropBottom());
+                                    android.graphics.Bitmap cropped = applyCrop(working, tmp);
+                                    if (working != baseBitmap && working != cropped && !working.isRecycled()) working.recycle();
+                                    working = cropped;
+                                }
+                                if (settings.getBrightness() != 0f || Math.abs(settings.getContrast() - 1f) > 1e-3) {
+                                    applyAdjustmentsInPlace(working, settings.getBrightness(), settings.getContrast());
+                                }
+                            }
+                        } catch (Throwable t) {
+                            android.util.Log.w(TAG, "exportFullSheetPdf: failed to apply page settings", t);
+                        }
+
+                        try {
+                            PageLayerEntity cropLayer = AppDatabase.getDatabase(requireContext().getApplicationContext()).pageLayerDao().getLatestCropLayerForPage(currentSheetId, original);
+                            if (cropLayer != null && cropLayer.hasCrop()) {
+                                android.graphics.Bitmap cropped = applyCrop(working, cropLayer);
+                                if (working != baseBitmap && working != cropped && !working.isRecycled()) working.recycle();
+                                working = cropped;
+                            }
+                        } catch (Throwable t) {
+                            android.util.Log.w(TAG, "exportFullSheetPdf: failed to apply crop layer", t);
+                        }
+                    }
+
+                    if (variant == ShareVariant.CROPPED_ANNOTATED) {
+                        try {
+                            PageLayerEntity ann = AppDatabase.getDatabase(requireContext().getApplicationContext())
+                                    .pageLayerDao().getActiveAnnotationLayer(currentSheetId, original);
+                            if (ann != null) {
+                                String path = ann.getLayerImagePath();
+                                if (path != null && !path.isEmpty()) {
+                                    android.graphics.Bitmap overlay = android.graphics.BitmapFactory.decodeFile(path);
+                                    if (overlay != null) {
+                                        android.graphics.Canvas canvas = new android.graphics.Canvas(working);
+                                        if (overlay.getWidth() != working.getWidth() || overlay.getHeight() != working.getHeight()) {
+                                            android.graphics.Bitmap scaled = android.graphics.Bitmap.createScaledBitmap(overlay, working.getWidth(), working.getHeight(), true);
+                                            canvas.drawBitmap(scaled, 0, 0, null);
+                                            if (scaled != overlay) scaled.recycle();
+                                            overlay.recycle();
+                                        } else {
+                                            canvas.drawBitmap(overlay, 0, 0, null);
+                                            overlay.recycle();
+                                        }
+                                    }
+                                }
+                            }
+                        } catch (Throwable t) {
+                            android.util.Log.w(TAG, "exportFullSheetPdf: failed to overlay annotation", t);
+                        }
+                    }
+
+                    // Add bitmap as a page in PDF
+                    float w = working.getWidth();
+                    float h = working.getHeight();
+                    com.tom_roush.pdfbox.pdmodel.common.PDRectangle rect = new com.tom_roush.pdfbox.pdmodel.common.PDRectangle(w, h);
+                    com.tom_roush.pdfbox.pdmodel.PDPage page = new com.tom_roush.pdfbox.pdmodel.PDPage(rect);
+                    outDoc.addPage(page);
+                    com.tom_roush.pdfbox.pdmodel.graphics.image.PDImageXObject image = com.tom_roush.pdfbox.pdmodel.graphics.image.LosslessFactory.createFromImage(outDoc, working);
+                    com.tom_roush.pdfbox.pdmodel.PDPageContentStream cs = new com.tom_roush.pdfbox.pdmodel.PDPageContentStream(outDoc, page, com.tom_roush.pdfbox.pdmodel.PDPageContentStream.AppendMode.OVERWRITE, true, true);
+                    cs.drawImage(image, 0, 0, w, h);
+                    cs.close();
+
+                    if (working != baseBitmap && !working.isRecycled()) working.recycle();
+                    if (!baseBitmap.isRecycled()) baseBitmap.recycle();
+                }
+
+                java.io.File dir = new java.io.File(requireContext().getCacheDir(), "share");
+                if (!dir.exists()) dir.mkdirs();
+
+                String baseName = null;
+                try {
+                    com.example.staffpad.database.SheetEntity s = com.example.staffpad.database.AppDatabase
+                            .getDatabase(requireContext().getApplicationContext())
+                            .sheetDao()
+                            .getSheetByIdSync(currentSheetId);
+                    if (s != null && s.getTitle() != null) {
+                        baseName = s.getTitle().trim();
+                    }
+                } catch (Throwable ignore) {}
+                if (baseName == null || baseName.isEmpty()) {
+                    baseName = "sheet_" + sheetId;
+                }
+                // Sanitize filename: remove characters not allowed on common filesystems
+                baseName = baseName.replaceAll("[\\\\/:*?\"<>|]+", "_");
+                if (baseName.isEmpty()) {
+                    baseName = "sheet_" + sheetId;
+                }
+                if (!baseName.toLowerCase(java.util.Locale.US).endsWith(".pdf")) {
+                    baseName = baseName + ".pdf";
+                }
+
+                java.io.File out = new java.io.File(dir, baseName);
+                outDoc.save(out);
+                outDoc.close();
+                outDoc = null;
+
+                java.io.File finalOut = out;
+                runOnUiThread(() -> callback.accept(finalOut));
+            } catch (Throwable t) {
+                android.util.Log.e(TAG, "exportFullSheetPdf failed", t);
+                try { if (outDoc != null) outDoc.close(); } catch (Throwable ignore) {}
+                runOnUiThread(() -> callback.accept(null));
+            }
+        }).start();
+    }
+
     // Public controls for toolbox Annotate button
     public void enterAnnotationMode() {
         // While annotating, suppress compositing of persisted annotation layer to enable cross-session undo of last 20 steps

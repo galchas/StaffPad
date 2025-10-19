@@ -1215,7 +1215,7 @@ public class MainActivity extends AppCompatActivity {
                     launchRearrangeActivity();
                     break;
                 case "Share":
-                    Toast.makeText(this, "Share coming soon", Toast.LENGTH_SHORT).show();
+                    showShareOptions();
                     break;
                 case "Templates":
                     Toast.makeText(this, "Templates coming soon", Toast.LENGTH_SHORT).show();
@@ -2245,6 +2245,77 @@ public class MainActivity extends AppCompatActivity {
         });
 
         pianoDialog.show();
+    }
+
+    private void showShareOptions() {
+        androidx.fragment.app.Fragment f = getSupportFragmentManager().findFragmentById(R.id.content_container);
+        if (!(f instanceof SheetDetailFragment)) {
+            Toast.makeText(this, "Please open a sheet to share", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        final CharSequence[] options = new CharSequence[] {
+                "Original Sheet",
+                "Cropped Sheet",
+                "Cropped and Annotated Sheet"
+        };
+        new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle("What would you like to share?")
+                .setItems(options, (dialog, which) -> {
+                    SheetDetailFragment frag = (SheetDetailFragment) f;
+                    SheetDetailFragment.ShareVariant variant;
+                    switch (which) {
+                        case 0: variant = SheetDetailFragment.ShareVariant.ORIGINAL; break;
+                        case 1: variant = SheetDetailFragment.ShareVariant.CROPPED; break;
+                        default: variant = SheetDetailFragment.ShareVariant.CROPPED_ANNOTATED; break;
+                    }
+                    // Export entire sheet as a multi-page PDF based on the chosen variant
+                    frag.exportFullSheetPdf(variant, file -> {
+                        if (file == null) {
+                            Toast.makeText(this, "Failed to prepare file for sharing", Toast.LENGTH_SHORT).show();
+                            return;
+                        }
+                        shareFile(file, "application/pdf");
+                    });
+                })
+                .show();
+    }
+
+    private void shareBitmap(android.graphics.Bitmap bmp, String fileName) {
+        try {
+            java.io.File dir = new java.io.File(getCacheDir(), "share");
+            if (!dir.exists()) dir.mkdirs();
+            java.io.File out = new java.io.File(dir, fileName);
+            java.io.FileOutputStream fos = new java.io.FileOutputStream(out);
+            bmp.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, fos);
+            fos.flush();
+            fos.close();
+
+            android.net.Uri uri = androidx.core.content.FileProvider.getUriForFile(this, getPackageName() + ".fileprovider", out);
+
+            android.content.Intent send = new android.content.Intent(android.content.Intent.ACTION_SEND);
+            send.setType("image/png");
+            send.putExtra(android.content.Intent.EXTRA_STREAM, uri);
+            send.addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION);
+
+            startActivity(android.content.Intent.createChooser(send, "Share Sheet"));
+        } catch (Exception e) {
+            android.util.Log.e("MainActivity", "Error sharing bitmap", e);
+            android.widget.Toast.makeText(this, "Unable to share", android.widget.Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void shareFile(java.io.File file, String mimeType) {
+        try {
+            android.net.Uri uri = androidx.core.content.FileProvider.getUriForFile(this, getPackageName() + ".fileprovider", file);
+            android.content.Intent send = new android.content.Intent(android.content.Intent.ACTION_SEND);
+            send.setType(mimeType);
+            send.putExtra(android.content.Intent.EXTRA_STREAM, uri);
+            send.addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            startActivity(android.content.Intent.createChooser(send, "Share Sheet"));
+        } catch (Exception e) {
+            android.util.Log.e("MainActivity", "Error sharing file", e);
+            android.widget.Toast.makeText(this, "Unable to share", android.widget.Toast.LENGTH_SHORT).show();
+        }
     }
 
 }
