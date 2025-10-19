@@ -33,5 +33,10 @@
         android:configChanges="keyboardHidden|orientation|screenSize"
         android:exported="false"
         android:theme="@style/Theme.StaffPad" />
+    <activity
+        android:name=".RearrangePagesActivity"
+        android:configChanges="keyboardHidden|orientation|screenSize"
+        android:exported="false"
+        android:theme="@style/Theme.StaffPad" />
     </application>
 </manifest>

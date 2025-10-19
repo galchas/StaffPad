@@ -24,7 +24,7 @@ import java.util.concurrent.Executors;
                 PageLayerEntity.class,
                 PageSettingsEntity.class
         },
-        version = 3,
+        version = 4,
         exportSchema = false
 )
 public abstract class AppDatabase extends RoomDatabase {

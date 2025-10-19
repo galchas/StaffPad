@@ -52,6 +52,17 @@ import com.example.staffpad.database.repository.SheetMusicRepository;
 import com.example.staffpad.viewmodel.SheetViewModel;
 
 import com.example.staffpad.utils.SharedPreferencesHelper;
+import com.google.android.material.bottomsheet.BottomSheetDialog;
+import com.google.android.material.bottomsheet.BottomSheetBehavior;
+import android.widget.SeekBar;
+import android.widget.Toast;
+
+// PianoView sample imports
+import com.chengtao.pianoview.entity.Piano;
+import com.chengtao.pianoview.listener.OnLoadAudioListener;
+import com.chengtao.pianoview.listener.OnPianoAutoPlayListener;
+import com.chengtao.pianoview.listener.OnPianoListener;
+import com.chengtao.pianoview.view.PianoView;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -109,6 +120,7 @@ public class MainActivity extends AppCompatActivity {
     // Dialogs
     private CardView pageOptionsMenu;
     private CardView searchDialog;
+    private BottomSheetDialog pianoDialog;
 
     // State tracking
     private String currentSidebar = null;
@@ -127,6 +139,22 @@ public class MainActivity extends AppCompatActivity {
 
         // Initialize views
         initializeViews();
+
+        // Preload piano audio samples using a hidden PianoView
+        try {
+            PianoView preload = findViewById(R.id.pv_preload);
+            if (preload != null) {
+                preload.setSoundPollMaxStream(10);
+                preload.setLoadAudioListener(new OnLoadAudioListener() {
+                    @Override public void loadPianoAudioStart() { Log.d("PianoPreload", "start"); }
+                    @Override public void loadPianoAudioFinish() { Log.d("PianoPreload", "finish"); }
+                    @Override public void loadPianoAudioError(Exception e) { Log.e("PianoPreload", "error", e); }
+                    @Override public void loadPianoAudioProgress(int progress) { Log.d("PianoPreload", "progress:" + progress); }
+                });
+            }
+        } catch (Throwable t) {
+            Log.w("PianoPreload", "Preload setup failed", t);
+        }
 
         // Set up listeners
         setupListeners();
@@ -1184,7 +1212,7 @@ public class MainActivity extends AppCompatActivity {
                     }
                     break;
                 case "Rearrange":
-                    Toast.makeText(this, "Rearrange pages coming soon", Toast.LENGTH_SHORT).show();
+                    launchRearrangeActivity();
                     break;
                 case "Share":
                     Toast.makeText(this, "Share coming soon", Toast.LENGTH_SHORT).show();
@@ -1199,7 +1227,17 @@ public class MainActivity extends AppCompatActivity {
                     Toast.makeText(this, "ABC editor coming soon", Toast.LENGTH_SHORT).show();
                     break;
                 case "Piano":
-                    Toast.makeText(this, "Piano coming soon", Toast.LENGTH_SHORT).show();
+                    try {
+                        androidx.fragment.app.Fragment f = getSupportFragmentManager().findFragmentById(R.id.content_container);
+                        if (f instanceof SheetDetailFragment) {
+                            ((SheetDetailFragment) f).openPianoDialog();
+                        } else {
+                            Toast.makeText(this, "Please open a sheet first", Toast.LENGTH_SHORT).show();
+                        }
+                    } catch (Throwable t) {
+                        Toast.makeText(this, "Unable to open piano", Toast.LENGTH_SHORT).show();
+                        android.util.Log.e("MainActivity", "Failed to open piano dialog from fragment", t);
+                    }
                     break;
                 case "Recorder":
                     Toast.makeText(this, "Recorder coming soon", Toast.LENGTH_SHORT).show();
@@ -1627,25 +1665,30 @@ public class MainActivity extends AppCompatActivity {
                     Intent data = result.getData();
                     if (data != null && data.getData() != null) {
                         Uri fileUri = data.getData();
-                        String fileName = getFileNameFromUri(fileUri);
-
-                        // Determine if it's a PDF or image
-                        boolean isPdf = false;
-                        if (fileName != null && fileName.toLowerCase().endsWith(".pdf")) {
-                            isPdf = true;
-                        }
-
-                        if (!isPdf) {
-                            // For non-PDFs, prompt for a name
-                            showNameInputDialog(fileUri, fileName);
-                        } else {
-                            // For PDFs, add directly
-                            processAddSheet(fileUri, null);
-                        }
+                        // Avoid querying ContentResolver on the main thread; resolve name in background
+                        handlePickedFileAsync(fileUri);
                     }
                 }
             }
     );
+
+    private void handlePickedFileAsync(Uri fileUri) {
+        AppDatabase.databaseWriteExecutor.execute(() -> {
+            String fileName = null;
+            try {
+                fileName = getFileNameFromUri(fileUri);
+            } catch (Throwable ignore) {}
+            final String resolvedName = fileName;
+            final boolean isPdf = resolvedName != null && resolvedName.toLowerCase().endsWith(".pdf");
+            runOnUiThread(() -> {
+                if (!isPdf) {
+                    showNameInputDialog(fileUri, resolvedName);
+                } else {
+                    processAddSheet(fileUri, null);
+                }
+            });
+        });
+    }
 
     // Launcher for CropActivity results (replaces deprecated startActivityForResult)
     private final ActivityResultLauncher<Intent> cropActivityLauncher = registerForActivityResult(
@@ -2009,4 +2052,199 @@ public class MainActivity extends AppCompatActivity {
             }
         });
     }
+
+    // Launcher for RearrangePagesActivity results (replaces deprecated startActivityForResult)
+    private final ActivityResultLauncher<Intent> rearrangeActivityLauncher = registerForActivityResult(
+            new ActivityResultContracts.StartActivityForResult(),
+            result -> {
+                if (result.getResultCode() == Activity.RESULT_OK) {
+                    Intent data = result.getData();
+                    boolean changed = data != null && data.getBooleanExtra(RearrangePagesActivity.RESULT_CHANGED, false);
+                    if (changed) {
+                        refreshCurrentPage(); // recreate fragment to pick up new page map
+                        Toast.makeText(this, "Pages updated", Toast.LENGTH_SHORT).show();
+                    }
+                }
+            }
+    );
+
+    private void launchRearrangeActivity() {
+        // Get the currently displayed sheet from the fragment
+        SheetDetailFragment fragment = (SheetDetailFragment) getSupportFragmentManager()
+                .findFragmentById(R.id.content_container);
+
+        if (fragment == null) {
+            Toast.makeText(this, "Please select a sheet first", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        // Dismiss bottom player if visible per feature parity with crop
+        try { fragment.dismissAndStopPlayer(); } catch (Throwable ignore) {}
+
+        long currentSheetId = fragment.getSheetId();
+        if (currentSheetId == -1) {
+            Toast.makeText(this, "Please select a sheet first", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        // Launch directly using current sheet ID to avoid LiveData observer relaunch on DB updates
+        Intent intent = new Intent(this, RearrangePagesActivity.class);
+        intent.putExtra(RearrangePagesActivity.EXTRA_SHEET_ID, currentSheetId);
+        rearrangeActivityLauncher.launch(intent);
+    }
+
+    private void dismissPianoDialog() {
+        if (pianoDialog != null && pianoDialog.isShowing()) {
+            try { pianoDialog.dismiss(); } catch (Throwable ignore) {}
+        }
+    }
+
+    // Piano sample state
+    private boolean pianoIsPlay = false;
+    private int pianoScrollProgress = 0;
+    private PianoView activePianoView;
+
+    private void showPianoDialog() {
+        // Dismiss any existing piano dialog instance
+        dismissPianoDialog();
+
+        // Also make sure the media player bottom dialog is closed and stopped
+        try {
+            androidx.fragment.app.Fragment f = getSupportFragmentManager().findFragmentById(R.id.content_container);
+            if (f instanceof SheetDetailFragment) {
+                ((SheetDetailFragment) f).dismissAndStopPlayer();
+            }
+        } catch (Throwable ignore) {}
+
+        pianoDialog = new BottomSheetDialog(this);
+        View content = getLayoutInflater().inflate(R.layout.bottom_dialog_piano, null);
+        pianoDialog.setContentView(content);
+
+        // Ensure the bottom sheet fills the screen width
+        pianoDialog.setOnShowListener(dialog -> {
+            try {
+                android.view.Window window = pianoDialog.getWindow();
+                if (window != null) {
+                    window.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+                    // Match SheetDetailFragment implementation: remove outside dim/scrim
+                    window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+                    android.view.WindowManager.LayoutParams wlp = window.getAttributes();
+                    if (wlp != null) {
+                        wlp.dimAmount = 0f;
+                        window.setAttributes(wlp);
+                    }
+                }
+            } catch (Throwable ignore) {}
+            try {
+                android.widget.FrameLayout bottomSheet = pianoDialog.findViewById(com.google.android.material.R.id.design_bottom_sheet);
+                if (bottomSheet != null) {
+                    ViewGroup.LayoutParams lp = bottomSheet.getLayoutParams();
+                    if (lp != null) {
+                        lp.width = ViewGroup.LayoutParams.MATCH_PARENT;
+                        lp.height = ViewGroup.LayoutParams.WRAP_CONTENT;
+                        if (lp instanceof ViewGroup.MarginLayoutParams) {
+                            ((ViewGroup.MarginLayoutParams) lp).leftMargin = 0;
+                            ((ViewGroup.MarginLayoutParams) lp).rightMargin = 0;
+                        }
+                        bottomSheet.setLayoutParams(lp);
+                    }
+                    // Remove default side paddings/insets applied by the dialog container so the sheet spans edge-to-edge
+                    try {
+                        View parent = (View) bottomSheet.getParent();
+                        if (parent != null) {
+                            parent.setPadding(0, 0, 0, 0);
+                            if (parent.getBackground() != null) parent.setBackgroundColor(android.graphics.Color.TRANSPARENT);
+                        }
+                    } catch (Throwable ignore2) {}
+                    // Clear background so shape insets don't add margins
+                    try { bottomSheet.setBackground(null); } catch (Throwable ignore3) {}
+
+                    BottomSheetBehavior<android.widget.FrameLayout> behavior = BottomSheetBehavior.from(bottomSheet);
+                    behavior.setFitToContents(true);
+                    try {
+                        int screenWidth = getResources().getDisplayMetrics().widthPixels;
+                        behavior.setMaxWidth(screenWidth);
+                    } catch (Throwable ignore) {}
+                }
+            } catch (Throwable ignore) {}
+        });
+
+        // Views
+        PianoView pianoView = content.findViewById(R.id.pv);
+        SeekBar seekBar = content.findViewById(R.id.sb);
+        View leftArrow = content.findViewById(R.id.iv_left_arrow);
+        View rightArrow = content.findViewById(R.id.iv_right_arrow);
+
+        activePianoView = pianoView;
+        if (pianoView != null) {
+            pianoView.setSoundPollMaxStream(10);
+            pianoView.setPianoListener(new OnPianoListener() {
+                @Override public void onPianoInitFinish() {}
+                @Override public void onPianoClick(Piano.PianoKeyType type, Piano.PianoVoice voice, int group, int positionOfGroup) {}
+            });
+            pianoView.setAutoPlayListener(new OnPianoAutoPlayListener() {
+                @Override public void onPianoAutoPlayStart() { Toast.makeText(MainActivity.this, "onPianoAutoPlayStart", Toast.LENGTH_SHORT).show(); }
+                @Override public void onPianoAutoPlayEnd() { Toast.makeText(MainActivity.this, "onPianoAutoPlayEnd", Toast.LENGTH_SHORT).show(); pianoIsPlay = false; }
+            });
+            pianoView.setLoadAudioListener(new OnLoadAudioListener() {
+                @Override public void loadPianoAudioStart() { Toast.makeText(getApplicationContext(), "loadPianoMusicStart", Toast.LENGTH_SHORT).show(); }
+                @Override public void loadPianoAudioFinish() { Toast.makeText(getApplicationContext(), "loadPianoMusicFinish", Toast.LENGTH_SHORT).show(); }
+                @Override public void loadPianoAudioError(Exception e) { Toast.makeText(getApplicationContext(), "loadPianoMusicError", Toast.LENGTH_SHORT).show(); }
+                @Override public void loadPianoAudioProgress(int progress) { Log.e("TAG", "progress:" + progress); }
+            });
+        }
+
+        if (seekBar != null) {
+            // Thumb offset to mimic sample (-12dp). Use density for px.
+            try {
+                float density = getResources().getDisplayMetrics().density;
+                seekBar.setThumbOffset((int) (-12 * density));
+            } catch (Throwable ignore) {}
+            seekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+                @Override public void onProgressChanged(SeekBar sb, int i, boolean b) { if (activePianoView != null) activePianoView.scroll(i); }
+                @Override public void onStartTrackingTouch(SeekBar seekBar) {}
+                @Override public void onStopTrackingTouch(SeekBar seekBar) {}
+            });
+        }
+
+        View.OnClickListener arrowsListener = v -> {
+            if (pianoScrollProgress == 0 && activePianoView != null) {
+                try {
+                    pianoScrollProgress = (activePianoView.getLayoutWidth() * 100) / activePianoView.getPianoWidth();
+                } catch (Throwable ignore) {}
+            }
+            if (seekBar == null) return;
+            int progress;
+            if (v.getId() == R.id.iv_left_arrow) {
+                if (pianoScrollProgress == 0) {
+                    progress = 0;
+                } else {
+                    progress = seekBar.getProgress() - pianoScrollProgress;
+                    if (progress < 0) progress = 0;
+                }
+                seekBar.setProgress(progress);
+            } else if (v.getId() == R.id.iv_right_arrow) {
+                if (pianoScrollProgress == 0) {
+                    progress = 100;
+                } else {
+                    progress = seekBar.getProgress() + pianoScrollProgress;
+                    if (progress > 100) progress = 100;
+                }
+                seekBar.setProgress(progress);
+            }
+        };
+        if (leftArrow != null) leftArrow.setOnClickListener(arrowsListener);
+        if (rightArrow != null) rightArrow.setOnClickListener(arrowsListener);
+
+
+        pianoDialog.setOnDismissListener(d -> {
+            try {
+                if (activePianoView != null) activePianoView.releaseAutoPlay();
+            } catch (Throwable ignore) {}
+            activePianoView = null;
+        });
+
+        pianoDialog.show();
+    }
+
 }

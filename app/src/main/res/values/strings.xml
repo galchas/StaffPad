@@ -79,4 +79,13 @@
     <string name="play_button">Play Button</string>
     <string name="pause_button">Pause Button</string>
     <string name="tool_icon">tool icon</string>
+    <string name="rearrange_pages">Rearrange Pages</string>
+    <string name="multi_select">Multi-select</string>
+    <string name="save">Save</string>
+    <string name="delete_pages">Delete pages</string>
+    <string name="select">Select</string>
+    <string name="play">Play</string>
+    <string name="dissmiss_button">dissmiss button</string>
+    <string name="left_button">left button</string>
+    <string name="right_button">right button</string>
 </resources>

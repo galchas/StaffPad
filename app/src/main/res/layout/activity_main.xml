@@ -145,6 +145,20 @@
         </androidx.constraintlayout.widget.ConstraintLayout>
     </androidx.appcompat.widget.Toolbar>
 
+    <!-- Hidden PianoView to preload audio samples at app startup -->
+    <FrameLayout
+        android:id="@+id/piano_preload_container"
+        android:layout_width="1dp"
+        android:layout_height="1dp"
+        android:alpha="0"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/app_toolbar">
+        <com.chengtao.pianoview.view.PianoView
+            android:id="@+id/pv_preload"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+    </FrameLayout>
+
     <!-- Main Content Area (Score View) -->
     <androidx.fragment.app.FragmentContainerView
         android:id="@+id/content_container"

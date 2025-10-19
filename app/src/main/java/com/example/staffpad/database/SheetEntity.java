@@ -52,6 +52,13 @@ public class SheetEntity implements Parcelable {
     @ColumnInfo(name = "last_opened_at")
     private long lastOpenedAt;
 
+    // Optional JSON strings storing custom page order and deleted pages for this sheet
+    @ColumnInfo(name = "page_order_json")
+    private String pageOrderJson; // e.g., "[0,2,1,3]" mapping logical index -> original page
+
+    @ColumnInfo(name = "deleted_pages_json")
+    private String deletedPagesJson; // e.g., "[4,7]" original page indices deleted
+
     // Constructor
     public SheetEntity(String title, String filename, String filePath, long fileSize, int pageCount) {
         this.title = title;
@@ -79,6 +86,8 @@ public class SheetEntity implements Parcelable {
         key = in.readString();
         createdAt = in.readLong();
         lastOpenedAt = in.readLong();
+        pageOrderJson = in.readString();
+        deletedPagesJson = in.readString();
     }
 
     public static final Creator<SheetEntity> CREATOR = new Creator<SheetEntity>() {
@@ -213,6 +222,22 @@ public class SheetEntity implements Parcelable {
         this.lastOpenedAt = lastOpenedAt;
     }
 
+    public String getPageOrderJson() {
+        return pageOrderJson;
+    }
+
+    public void setPageOrderJson(String pageOrderJson) {
+        this.pageOrderJson = pageOrderJson;
+    }
+
+    public String getDeletedPagesJson() {
+        return deletedPagesJson;
+    }
+
+    public void setDeletedPagesJson(String deletedPagesJson) {
+        this.deletedPagesJson = deletedPagesJson;
+    }
+
     @Override
     public int describeContents() {
         return 0;
@@ -234,5 +259,7 @@ public class SheetEntity implements Parcelable {
         dest.writeString(key);
         dest.writeLong(createdAt);
         dest.writeLong(lastOpenedAt);
+        dest.writeString(pageOrderJson);
+        dest.writeString(deletedPagesJson);
     }
 }

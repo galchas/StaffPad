@@ -31,6 +31,11 @@ android {
     }
 }
 
+// Exclude legacy support libraries to avoid duplicate classes with AndroidX
+configurations.all {
+    exclude(group = "com.android.support")
+}
+
 dependencies {
 
     implementation(libs.appcompat)
@@ -66,6 +71,6 @@ dependencies {
     //YOUTUBE PLAYER
     implementation(libs.androidyoutubeplayercore)
 
-
-
+    //Piano View
+    implementation(libs.pianoview)
 }

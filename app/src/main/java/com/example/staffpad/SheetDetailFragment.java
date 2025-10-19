@@ -24,9 +24,7 @@ import androidx.lifecycle.LiveData;
 import com.example.staffpad.database.SheetEntity;
 import com.example.staffpad.viewmodel.SheetViewModel;
 import com.example.staffpad.views.AnnotationOverlayView;
-import com.github.chrisbanes.photoview.OnPhotoTapListener;
 import com.github.chrisbanes.photoview.PhotoView;
-import com.github.chrisbanes.photoview.OnViewTapListener;
 import com.tom_roush.pdfbox.pdmodel.PDDocument;
 import com.tom_roush.pdfbox.rendering.PDFRenderer;
 import com.tom_roush.pdfbox.io.MemoryUsageSetting;
@@ -51,6 +49,10 @@ import android.app.ActivityManager;
 import android.content.Context;
 
 public class SheetDetailFragment extends Fragment {
+    // Piano bottom dialog managed by this fragment for parity with player bottom dialog
+    private com.google.android.material.bottomsheet.BottomSheetDialog pianoDialog;
+    private com.chengtao.pianoview.view.PianoView activePianoViewForPiano;
+    private int pianoScrollProgress = 0;
     // Keep a weak reference to the latest instance so other UI parts can request a pause
     private static java.lang.ref.WeakReference<SheetDetailFragment> sLastInstanceRef = new java.lang.ref.WeakReference<>(null);
 
@@ -122,6 +124,49 @@ public class SheetDetailFragment extends Fragment {
     private final Object renderLock = new Object();
     private boolean androidRendererOnly = false;
     private int altPageCount = -1;
+
+    // Logical-to-original page mapping to support rearrange/delete feature
+    private java.util.List<Integer> pageMap = null; // if null, identity mapping
+
+    private int mapLogicalToOriginal(int logicalIndex) {
+        if (pageMap == null) return logicalIndex;
+        if (logicalIndex < 0 || logicalIndex >= pageMap.size()) return 0;
+        return pageMap.get(logicalIndex);
+    }
+
+    private void buildPageMapping(SheetEntity sheet, int originalPageCount) {
+        pageMap = null;
+        try {
+            java.util.HashSet<Integer> deleted = new java.util.HashSet<>();
+            if (sheet.getDeletedPagesJson() != null && !sheet.getDeletedPagesJson().isEmpty()) {
+                org.json.JSONArray del = new org.json.JSONArray(sheet.getDeletedPagesJson());
+                for (int i = 0; i < del.length(); i++) {
+                    deleted.add(del.getInt(i));
+                }
+            }
+            java.util.ArrayList<Integer> map = new java.util.ArrayList<>();
+            if (sheet.getPageOrderJson() != null && !sheet.getPageOrderJson().isEmpty()) {
+                org.json.JSONArray arr = new org.json.JSONArray(sheet.getPageOrderJson());
+                for (int i = 0; i < arr.length(); i++) {
+                    int orig = arr.getInt(i);
+                    if (!deleted.contains(orig) && orig >= 0 && orig < originalPageCount) {
+                        map.add(orig);
+                    }
+                }
+            } else {
+                for (int orig = 0; orig < originalPageCount; orig++) {
+                    if (!deleted.contains(orig)) map.add(orig);
+                }
+            }
+            // Fallback to identity if empty
+            if (!map.isEmpty()) {
+                pageMap = map;
+            }
+        } catch (Throwable ignore) {
+            // keep pageMap null (identity)
+            pageMap = null;
+        }
+    }
 
     public SheetDetailFragment() {
         // Required empty public constructor
@@ -746,29 +791,32 @@ public class SheetDetailFragment extends Fragment {
                     }
                 }
 
-                // Render current page
-                int total = getTotalPageCountInternal(pdfFile);
-                if (total > 0 && currentPage >= total) {
+                // Determine original and effective page counts, and build mapping
+                int originalTotal = getTotalPageCountInternal(pdfFile);
+                buildPageMapping(sheet, originalTotal);
+                int effectiveTotal = getTotalPageCount();
+                if (effectiveTotal > 0 && currentPage >= effectiveTotal) {
                     currentPage = 0;
                 }
+                int originalIndex = mapLogicalToOriginal(currentPage);
 
                 // Render base page with PdfBox; fallback to Android PdfRenderer on failure
                 Bitmap baseBitmap;
                 try {
                     float scale = (!androidRendererOnly && renderer != null) ? getPdfBoxRenderScale() : getAndroidRenderScale();
                     synchronized (renderLock) {
-                        baseBitmap = renderer != null ? renderer.renderImage(currentPage, scale) : null;
+                        baseBitmap = renderer != null ? renderer.renderImage(originalIndex, scale) : null;
                     }
                 } catch (OutOfMemoryError oom) {
                     Log.e(TAG, "PdfBox render OOM, switching to Android PdfRenderer", oom);
                     switchToAndroidRendererOnly(pdfFile);
                     float scale = getAndroidRenderScale();
-                    baseBitmap = renderWithAndroidPdfRenderer(pdfFile, currentPage, scale);
+                    baseBitmap = renderWithAndroidPdfRenderer(pdfFile, originalIndex, scale);
                 } catch (Throwable t) {
                     Log.e(TAG, "PdfBox render failed, falling back to Android PdfRenderer", t);
                     switchToAndroidRendererOnly(pdfFile);
                     float scale = getAndroidRenderScale();
-                    baseBitmap = renderWithAndroidPdfRenderer(pdfFile, currentPage, scale);
+                    baseBitmap = renderWithAndroidPdfRenderer(pdfFile, originalIndex, scale);
                 }
 
                 if (baseBitmap == null) {
@@ -781,8 +829,8 @@ public class SheetDetailFragment extends Fragment {
                     return;
                 }
 
-                // Load and apply layers
-                loadAndApplyLayers(sheet.getId(), currentPage, baseBitmap);
+                // Load and apply layers using original page index
+                loadAndApplyLayers(sheet.getId(), originalIndex, baseBitmap);
 
             } catch (Exception e) {
                 Log.e(TAG, "Error loading PDF", e);
@@ -1094,6 +1142,7 @@ public class SheetDetailFragment extends Fragment {
         target.setPixels(pixels, 0, width, 0, 0, width, height);
     }
     public void setCurrentPage(int pageNumber) {
+        // logical page index requested by UI
         this.currentPage = pageNumber;
 
         int total = getTotalPageCount();
@@ -1104,6 +1153,9 @@ public class SheetDetailFragment extends Fragment {
             return;
         }
 
+        // map logical index to original PDF page index considering reorders/deletions
+        final int originalIndex = mapLogicalToOriginal(pageNumber);
+
         new Thread(() -> {
             try {
                 Bitmap baseBitmap;
@@ -1111,21 +1163,21 @@ public class SheetDetailFragment extends Fragment {
                     float scale = (!androidRendererOnly && renderer != null) ? getPdfBoxRenderScale() : getAndroidRenderScale();
                     if (!androidRendererOnly && renderer != null) {
                         synchronized (renderLock) {
-                            baseBitmap = renderer.renderImage(pageNumber, scale);
+                            baseBitmap = renderer.renderImage(originalIndex, scale);
                         }
                     } else {
-                        baseBitmap = currentPdfFile != null ? renderWithAndroidPdfRenderer(currentPdfFile, pageNumber, scale) : null;
+                        baseBitmap = currentPdfFile != null ? renderWithAndroidPdfRenderer(currentPdfFile, originalIndex, scale) : null;
                     }
                 } catch (OutOfMemoryError oom) {
                     Log.e(TAG, "PdfBox render OOM on page change, switching to Android PdfRenderer", oom);
                     if (currentPdfFile != null) switchToAndroidRendererOnly(currentPdfFile);
                     float scale = getAndroidRenderScale();
-                    baseBitmap = currentPdfFile != null ? renderWithAndroidPdfRenderer(currentPdfFile, pageNumber, scale) : null;
+                    baseBitmap = currentPdfFile != null ? renderWithAndroidPdfRenderer(currentPdfFile, originalIndex, scale) : null;
                 } catch (Throwable t) {
                     Log.e(TAG, "PdfBox render failed on page change, using Android PdfRenderer", t);
                     if (currentPdfFile != null) switchToAndroidRendererOnly(currentPdfFile);
                     float scale = getAndroidRenderScale();
-                    baseBitmap = currentPdfFile != null ? renderWithAndroidPdfRenderer(currentPdfFile, pageNumber, scale) : null;
+                    baseBitmap = currentPdfFile != null ? renderWithAndroidPdfRenderer(currentPdfFile, originalIndex, scale) : null;
                 }
 
                 if (baseBitmap == null) {
@@ -1133,10 +1185,10 @@ public class SheetDetailFragment extends Fragment {
                     return;
                 }
 
-                // Apply layers and display on UI
-                loadAndApplyLayers(sheetId, pageNumber, baseBitmap);
+                // Apply layers and display on UI using original page index
+                loadAndApplyLayers(sheetId, originalIndex, baseBitmap);
 
-                // Update page indicator and save page
+                // Update page indicator and save page using logical index
                 runOnUiThread(() -> {
                     int t = getTotalPageCount();
                     if (t > 0) {
@@ -1163,12 +1215,14 @@ public class SheetDetailFragment extends Fragment {
         } catch (Throwable t) {
             Log.w(TAG, "toggleUiChrome: could not toggle app toolbar", t);
         }
-        // Toggle bottom player lazily
+        // Toggle bottom player lazily, and ensure piano dialog follows the same visibility rule
         if (!isBottomDialogVisible()) {
             inflateBottomPlayerIfNeeded();
             showBottomDialog();
         } else {
             hideBottomDialog();
+            // Hide piano dialog as well to behave like the player bottom dialog
+            dismissPianoDialog();
         }
     }
 
@@ -1803,6 +1857,8 @@ public class SheetDetailFragment extends Fragment {
                 if (x >= left && x <= right && y >= top && y <= bottom) {
                     Log.d(TAG, "Nav: double-tap center -> enter annotation mode (hide bottom player and pause)");
                     hideBottomDialog();
+                    // Ensure piano dialog follows the same behavior
+                    dismissPianoDialog();
                     stopPlayerIfPlaying();
                     enterAnnotationMode();
                     return true;
@@ -1866,6 +1922,8 @@ public class SheetDetailFragment extends Fragment {
             youTubePlayer = null;
             bottomPlayerContainer = null; // will be re-inflated if needed next time
         }
+        // Ensure Piano dialog is dismissed to mirror player behavior
+        try { dismissPianoDialog(); } catch (Throwable ignore) {}
         synchronized (renderLock) {
             if (document != null) {
                 try { document.close(); } catch (IOException e) { Log.e(TAG, "Error closing document in onDestroyView", e); }
@@ -2089,8 +2147,12 @@ public class SheetDetailFragment extends Fragment {
 
     private int getTotalPageCount() {
         try {
-            if (document != null) return document.getNumberOfPages();
-            if (altPageCount > 0) return altPageCount;
+            int base;
+            if (document != null) base = document.getNumberOfPages();
+            else if (altPageCount > 0) base = altPageCount;
+            else base = 0;
+            if (pageMap != null) return pageMap.size();
+            return base;
         } catch (Throwable ignored) {}
         return 0;
     }
@@ -2120,29 +2182,30 @@ public class SheetDetailFragment extends Fragment {
             Log.w(TAG, "refreshPage: currentPdfFile is null; skipping re-render");
             return;
         }
-        final int page = currentPage;
+        final int logical = currentPage;
         new Thread(() -> {
             try {
+                int original = mapLogicalToOriginal(logical);
                 Bitmap baseBitmap;
                 try {
                     float scale = (!androidRendererOnly && renderer != null) ? getPdfBoxRenderScale() : getAndroidRenderScale();
                     if (!androidRendererOnly && renderer != null) {
                         synchronized (renderLock) {
-                            baseBitmap = renderer.renderImage(page, scale);
+                            baseBitmap = renderer.renderImage(original, scale);
                         }
                     } else {
-                        baseBitmap = renderWithAndroidPdfRenderer(currentPdfFile, page, scale);
+                        baseBitmap = renderWithAndroidPdfRenderer(currentPdfFile, original, scale);
                     }
                 } catch (OutOfMemoryError oom) {
                     Log.e(TAG, "PdfBox render OOM in refreshPage, switching to Android PdfRenderer", oom);
                     if (currentPdfFile != null) switchToAndroidRendererOnly(currentPdfFile);
                     float scale = getAndroidRenderScale();
-                    baseBitmap = renderWithAndroidPdfRenderer(currentPdfFile, page, scale);
+                    baseBitmap = renderWithAndroidPdfRenderer(currentPdfFile, original, scale);
                 } catch (Throwable t) {
                     Log.e(TAG, "PdfBox render failed in refreshPage, using Android PdfRenderer", t);
                     if (currentPdfFile != null) switchToAndroidRendererOnly(currentPdfFile);
                     float scale = getAndroidRenderScale();
-                    baseBitmap = renderWithAndroidPdfRenderer(currentPdfFile, page, scale);
+                    baseBitmap = renderWithAndroidPdfRenderer(currentPdfFile, original, scale);
                 }
 
                 if (baseBitmap == null) {
@@ -2150,11 +2213,11 @@ public class SheetDetailFragment extends Fragment {
                     return;
                 }
 
-                loadAndApplyLayers(sheetId, page, baseBitmap);
+                loadAndApplyLayers(sheetId, original, baseBitmap);
 
                 runOnUiThread(() -> {
                     int t = getTotalPageCount();
-                    if (t > 0) updatePageIndicator(page + 1, t);
+                    if (t > 0) updatePageIndicator(logical + 1, t);
                 });
             } catch (Exception e) {
                 Log.e(TAG, "Error refreshing page", e);
@@ -2162,6 +2225,149 @@ public class SheetDetailFragment extends Fragment {
             }
         }).start();
     }//
+
+    // Piano dialog controls (managed here to behave like the player bottom dialog)
+    public void openPianoDialog() {
+        // Close any existing instance
+        dismissPianoDialog();
+        // Ensure media player bottom UI is dismissed and playback stopped, like when opening other tools
+        try { dismissAndStopPlayer(); } catch (Throwable ignore) {}
+        ensureToolbarVisible();
+        final androidx.fragment.app.FragmentActivity act = requireActivity();
+        pianoDialog = new com.google.android.material.bottomsheet.BottomSheetDialog(act);
+        final android.view.View content = getLayoutInflater().inflate(R.layout.bottom_dialog_piano, null);
+        pianoDialog.setContentView(content);
+        // Force full-width like player
+        pianoDialog.setOnShowListener(dlg -> {
+            try {
+                android.view.Window window = pianoDialog.getWindow();
+                if (window != null) {
+                    // Make dialog occupy full width and remove outside dim (gray area)
+                    window.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+                    window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+                    android.view.WindowManager.LayoutParams wlp = window.getAttributes();
+                    if (wlp != null) {
+                        wlp.dimAmount = 0f;
+                        window.setAttributes(wlp);
+                    }
+                }
+            } catch (Throwable ignore) {}
+            try {
+                android.widget.FrameLayout bottomSheet = pianoDialog.findViewById(com.google.android.material.R.id.design_bottom_sheet);
+                if (bottomSheet != null) {
+                    ViewGroup.LayoutParams lp = bottomSheet.getLayoutParams();
+                    if (lp != null) {
+                        lp.width = ViewGroup.LayoutParams.MATCH_PARENT;
+                        lp.height = ViewGroup.LayoutParams.WRAP_CONTENT;
+                        if (lp instanceof ViewGroup.MarginLayoutParams) {
+                            ((ViewGroup.MarginLayoutParams) lp).leftMargin = 0;
+                            ((ViewGroup.MarginLayoutParams) lp).rightMargin = 0;
+                        }
+                        bottomSheet.setLayoutParams(lp);
+                    }
+                    // Remove any parent padding and background to achieve edge-to-edge and no outside gray scrim
+                    try {
+                        View parent = (View) bottomSheet.getParent();
+                        if (parent != null) {
+                            parent.setPadding(0, 0, 0, 0);
+                            if (parent.getBackground() != null) parent.setBackgroundColor(android.graphics.Color.TRANSPARENT);
+                        }
+                    } catch (Throwable ignore) {}
+                    try { bottomSheet.setBackground(null); } catch (Throwable ignore) {}
+                    com.google.android.material.bottomsheet.BottomSheetBehavior<android.widget.FrameLayout> behavior = com.google.android.material.bottomsheet.BottomSheetBehavior.from(bottomSheet);
+                    behavior.setFitToContents(true);
+                    try {
+                        int screenWidth = getResources().getDisplayMetrics().widthPixels;
+                        behavior.setMaxWidth(screenWidth);
+                    } catch (Throwable ignore) {}
+                }
+            } catch (Throwable ignore) {}
+        });
+
+        final com.chengtao.pianoview.view.PianoView pianoView = content.findViewById(R.id.pv);
+        final android.widget.SeekBar seekBar = content.findViewById(R.id.sb);
+        final View leftArrow = content.findViewById(R.id.iv_left_arrow);
+        final View rightArrow = content.findViewById(R.id.iv_right_arrow);
+
+        activePianoViewForPiano = pianoView;
+        if (pianoView != null) {
+            pianoView.setSoundPollMaxStream(10);
+            pianoView.setPianoListener(new com.chengtao.pianoview.listener.OnPianoListener() {
+                @Override public void onPianoInitFinish() {}
+                @Override public void onPianoClick(com.chengtao.pianoview.entity.Piano.PianoKeyType type, com.chengtao.pianoview.entity.Piano.PianoVoice voice, int group, int positionOfGroup) {}
+            });
+            pianoView.setAutoPlayListener(new com.chengtao.pianoview.listener.OnPianoAutoPlayListener() {
+                @Override public void onPianoAutoPlayStart() { Log.d("Piano", "autoPlayStart"); }
+                @Override public void onPianoAutoPlayEnd() { Log.d("Piano", "autoPlayEnd"); }
+            });
+            pianoView.setLoadAudioListener(new com.chengtao.pianoview.listener.OnLoadAudioListener() {
+                @Override public void loadPianoAudioStart() { Log.d("Piano", "loadStart"); }
+                @Override public void loadPianoAudioFinish() { Log.d("Piano", "loadFinish"); }
+                @Override public void loadPianoAudioError(Exception e) { Log.e("Piano", "loadError", e); }
+                @Override public void loadPianoAudioProgress(int progress) { Log.d("Piano", "progress:" + progress); }
+            });
+        }
+
+        if (seekBar != null) {
+            try {
+                float density = getResources().getDisplayMetrics().density;
+                seekBar.setThumbOffset((int) (-12 * density));
+            } catch (Throwable ignore) {}
+            seekBar.setOnSeekBarChangeListener(new android.widget.SeekBar.OnSeekBarChangeListener() {
+                @Override public void onProgressChanged(android.widget.SeekBar sb, int i, boolean b) { if (activePianoViewForPiano != null) activePianoViewForPiano.scroll(i); }
+                @Override public void onStartTrackingTouch(android.widget.SeekBar seekBar) {}
+                @Override public void onStopTrackingTouch(android.widget.SeekBar seekBar) {}
+            });
+        }
+
+        View.OnClickListener arrowsListener = v -> {
+            if (pianoScrollProgress == 0 && activePianoViewForPiano != null) {
+                try {
+                    pianoScrollProgress = (activePianoViewForPiano.getLayoutWidth() * 100) / activePianoViewForPiano.getPianoWidth();
+                } catch (Throwable ignore) {}
+            }
+            if (seekBar == null) return;
+            int progress;
+            if (v.getId() == R.id.iv_left_arrow) {
+                if (pianoScrollProgress == 0) {
+                    progress = 0;
+                } else {
+                    progress = seekBar.getProgress() - pianoScrollProgress;
+                    if (progress < 0) progress = 0;
+                }
+                seekBar.setProgress(progress);
+            } else if (v.getId() == R.id.iv_right_arrow) {
+                if (pianoScrollProgress == 0) {
+                    progress = 100;
+                } else {
+                    progress = seekBar.getProgress() + pianoScrollProgress;
+                    if (progress > 100) progress = 100;
+                }
+                seekBar.setProgress(progress);
+            }
+        };
+        if (leftArrow != null) leftArrow.setOnClickListener(arrowsListener);
+        if (rightArrow != null) rightArrow.setOnClickListener(arrowsListener);
+
+        pianoDialog.setOnDismissListener(d -> {
+            try { if (activePianoViewForPiano != null) activePianoViewForPiano.releaseAutoPlay(); } catch (Throwable ignore) {}
+            activePianoViewForPiano = null;
+        });
+
+        pianoDialog.show();
+    }
+
+    private void dismissPianoDialog() {
+        try {
+            if (pianoDialog != null && pianoDialog.isShowing()) {
+                pianoDialog.dismiss();
+            }
+        } catch (Throwable ignore) {}
+    }
+
+    private boolean isPianoDialogShowing() {
+        return pianoDialog != null && pianoDialog.isShowing();
+    }
 
     public int getCurrentPage() {
         return this.currentPage;
