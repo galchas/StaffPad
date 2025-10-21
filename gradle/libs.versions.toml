@@ -14,6 +14,7 @@ pdfboxAndroid = "2.0.27.0"
 photoview = "2.3.0"
 pianoview = "1.1.5"
 roomVersion = "2.8.2"
+metronome = "1.0.0"
 androidyoutubeplayer = "13.0.0"
 
 [libraries]
@@ -34,6 +35,8 @@ navigation-ui = { module = "androidx.navigation:navigation-ui", version.ref = "n
 pdfbox-android = { module = "com.tom-roush:pdfbox-android", version.ref = "pdfboxAndroid" }
 photoview = { module = "com.github.chrisbanes:PhotoView", version.ref = "photoview" }
 pianoview = { module = "com.github.galchas:PianoView", version.ref = "pianoview" }
+metronome = { module = "com.github.galchas:Metronome", version.ref = "metronome" }
+
 room-compiler = { module = "androidx.room:room-compiler", version.ref = "roomVersion" }
 room-ktx = { module = "androidx.room:room-ktx", version.ref = "roomVersion" }
 room-runtime = { module = "androidx.room:room-runtime", version.ref = "roomVersion" }

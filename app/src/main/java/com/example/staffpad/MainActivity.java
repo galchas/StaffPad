@@ -112,6 +112,14 @@ public class MainActivity extends AppCompatActivity {
     private ImageButton toolsButton;
     private ImageButton metronomeButton;
     private ImageButton searchButton;
+    private ImageButton settingsButton;
+
+    // Metronome overlay UI
+    private androidx.cardview.widget.CardView metronomePanel;
+    private com.google.android.material.tabs.TabLayout tabLayoutMetronome;
+    private View tabContentMetronome;
+    private View tabContentPitch;
+    private android.view.ViewGroup metronomeViewContainer;
 
     // Search UI
     private View centerSearchToolbar;
@@ -288,6 +296,7 @@ public class MainActivity extends AppCompatActivity {
         toolsButton = findViewById(R.id.tools_button);
         metronomeButton = findViewById(R.id.metronome_button);
         searchButton = findViewById(R.id.search_button);
+        settingsButton = findViewById(R.id.settings_button);
 
         // Dialogs
         pageOptionsMenu = findViewById(R.id.page_options_menu);
@@ -337,6 +346,36 @@ public class MainActivity extends AppCompatActivity {
                 return false;
             });
         }
+
+        // Metronome overlay views
+        metronomePanel = findViewById(R.id.metronome_panel);
+        tabLayoutMetronome = findViewById(R.id.tab_layout_metronome);
+        tabContentMetronome = findViewById(R.id.tab_content_metronome);
+        tabContentPitch = findViewById(R.id.tab_content_pitch);
+        if (tabLayoutMetronome != null) {
+            tabLayoutMetronome.removeAllTabs();
+            tabLayoutMetronome.addTab(tabLayoutMetronome.newTab().setText(getString(R.string.metronome)));
+            tabLayoutMetronome.addTab(tabLayoutMetronome.newTab().setText(getString(R.string.pitch)));
+            tabLayoutMetronome.addOnTabSelectedListener(new com.google.android.material.tabs.TabLayout.OnTabSelectedListener() {
+                @Override
+                public void onTabSelected(com.google.android.material.tabs.TabLayout.Tab tab) {
+                    int pos = tab.getPosition();
+                    if (tabContentMetronome != null && tabContentPitch != null) {
+                        tabContentMetronome.setVisibility(pos == 0 ? View.VISIBLE : View.GONE);
+                        tabContentPitch.setVisibility(pos == 1 ? View.VISIBLE : View.GONE);
+                    }
+                }
+                @Override public void onTabUnselected(com.google.android.material.tabs.TabLayout.Tab tab) { }
+                @Override public void onTabReselected(com.google.android.material.tabs.TabLayout.Tab tab) { }
+            });
+            // Ensure default selection shows Metronome tab
+            com.google.android.material.tabs.TabLayout.Tab first = tabLayoutMetronome.getTabAt(0);
+            if (first != null) first.select();
+        }
+
+        // Try to create and attach MetronomeView programmatically to avoid inflation crash if class is missing
+        metronomeViewContainer = findViewById(R.id.metronome_view_container);
+        setupMetronomeView();
 
         // Setup top library menu buttons
         setupLibraryMenuButtons();
@@ -1085,6 +1124,51 @@ public class MainActivity extends AppCompatActivity {
         // Make sure filter is still applied
         updateLibraryWithFilter();
     }
+    private void setupMetronomeView() {
+        if (metronomeViewContainer == null) return;
+        try {
+            Class<?> cls = Class.forName("com.bobek.metronome.view.MetronomeView");
+            android.view.View view = null;
+            try {
+                java.lang.reflect.Constructor<?> c1 = cls.getConstructor(android.content.Context.class);
+                view = (android.view.View) c1.newInstance(this);
+            } catch (Throwable ignored) { }
+            if (view == null) {
+                try {
+                    java.lang.reflect.Constructor<?> c2 = cls.getConstructor(android.content.Context.class, android.util.AttributeSet.class);
+                    view = (android.view.View) c2.newInstance(this, null);
+                } catch (Throwable ignored) { }
+            }
+            if (view != null) {
+                if (view.getParent() instanceof android.view.ViewGroup) {
+                    ((android.view.ViewGroup) view.getParent()).removeView(view);
+                }
+                metronomeViewContainer.removeAllViews();
+                android.widget.FrameLayout.LayoutParams lp = new android.widget.FrameLayout.LayoutParams(
+                        android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                        android.view.ViewGroup.LayoutParams.WRAP_CONTENT
+                );
+                metronomeViewContainer.addView(view, lp);
+            }
+        } catch (ClassNotFoundException e) {
+            android.widget.TextView tv = new android.widget.TextView(this);
+            tv.setText("Metronome component not available");
+            tv.setTextColor(android.graphics.Color.RED);
+            tv.setPadding(16,16,16,16);
+            metronomeViewContainer.removeAllViews();
+            metronomeViewContainer.addView(tv);
+            Log.e("MainActivity", "MetronomeView class not found. Ensure dependency is included.", e);
+        } catch (Throwable t) {
+            android.widget.TextView tv = new android.widget.TextView(this);
+            tv.setText("Failed to load metronome");
+            tv.setTextColor(android.graphics.Color.RED);
+            tv.setPadding(16,16,16,16);
+            metronomeViewContainer.removeAllViews();
+            metronomeViewContainer.addView(tv);
+            Log.e("MainActivity", "Failed to instantiate MetronomeView", t);
+        }
+    }
+
     private void setupListeners() {
         // Set up scrim overlay click to dismiss sidebars
         scrimOverlay.setOnClickListener(v -> {
@@ -1104,9 +1188,21 @@ public class MainActivity extends AppCompatActivity {
         bookmarksButton.setOnClickListener(v -> toggleSidebar("bookmarks"));
         setlistButton.setOnClickListener(v -> toggleSidebar("setlist"));
         toolsButton.setOnClickListener(v -> toggleSidebar("tools"));
+        if (settingsButton != null) {
+            settingsButton.setOnClickListener(v -> {
+                SettingsDialogFragment dialog = SettingsDialogFragment.newInstance();
+                dialog.show(getSupportFragmentManager(), "settings_dialog");
+            });
+        }
 
         metronomeButton.setOnClickListener(v -> {
-            // Show metronome dialog or control
+            if (metronomePanel == null) return;
+            if (metronomePanel.getVisibility() == View.VISIBLE) {
+                metronomePanel.setVisibility(View.GONE);
+            } else {
+                metronomePanel.setVisibility(View.VISIBLE);
+                metronomePanel.bringToFront();
+            }
         });
 
         searchButton.setOnClickListener(v -> enterSearchMode());
@@ -1295,7 +1391,8 @@ public class MainActivity extends AppCompatActivity {
                     Toast.makeText(this, "Backup & Restore coming soon", Toast.LENGTH_SHORT).show();
                     break;
                 case "Settings":
-                    Toast.makeText(this, "Settings coming soon", Toast.LENGTH_SHORT).show();
+                    SettingsDialogFragment settingsDialog = SettingsDialogFragment.newInstance();
+                    settingsDialog.show(getSupportFragmentManager(), "settings_dialog");
                     break;
                 default:
                     Toast.makeText(this, toolName + " activated", Toast.LENGTH_SHORT).show();

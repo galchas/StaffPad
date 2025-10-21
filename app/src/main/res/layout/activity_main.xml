@@ -43,7 +43,7 @@
             android:contentDescription="@string/library"
             android:padding="12dp"
             android:src="@drawable/baseline_menu_book_24"
-            app:tint="#404040" />
+            app:tint="?attr/colorAccent" />
 
         <ImageButton
             android:id="@+id/bookmarks_button"
@@ -53,7 +53,7 @@
             android:contentDescription="@string/bookmarks"
             android:padding="12dp"
             android:src="@drawable/baseline_bookmark_24"
-            app:tint="#404040" />
+            app:tint="?attr/colorAccent" />
 
         <ImageButton
             android:id="@+id/setlist_button"
@@ -63,7 +63,17 @@
             android:contentDescription="@string/setlist"
             android:padding="12dp"
             android:src="@drawable/baseline_format_list_bulleted_24"
-            app:tint="#404040" />
+            app:tint="?attr/colorAccent" />
+
+        <ImageButton
+            android:id="@+id/settings_button"
+            android:layout_width="48dp"
+            android:layout_height="match_parent"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/settings"
+            android:padding="12dp"
+            android:src="@drawable/ic_info"
+            app:tint="?attr/colorAccent" />
     </com.google.android.material.appbar.MaterialToolbar>
 
     <!-- Floating Center Toolbar (Material 3) -->
@@ -86,7 +96,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="@string/single_page"
-            android:textColor="#505050"
+            android:textColor="?attr/colorAccent"
             android:textSize="14sp" />
 
         <TextView
@@ -96,7 +106,7 @@
             android:layout_marginStart="12dp"
             android:layout_marginEnd="8dp"
             android:text="@string/sheet_title"
-            android:textColor="#404040"
+            android:textColor="?attr/colorPrimary"
             android:textSize="18sp"
             android:textStyle="normal" />
 
@@ -105,7 +115,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="@string/_1_12"
-            android:textColor="#505050"
+            android:textColor="?attr/colorPrimary"
             android:textSize="14sp" />
     </com.google.android.material.appbar.MaterialToolbar>
 
@@ -116,7 +126,7 @@
         android:layout_width="wrap_content"
         android:layout_height="?attr/actionBarSize"
         android:layout_marginTop="8dp"
-        android:backgroundTint="@color/blue_background"
+        android:backgroundTint="?attr/colorSurface"
         android:elevation="6dp"
         android:visibility="gone"
 
@@ -134,7 +144,7 @@
             android:contentDescription="@string/cancel"
             android:padding="12dp"
             android:src="@drawable/round_close_24"
-            app:tint="@color/blue_on_tertiary" />
+            app:tint="?attr/colorPrimary" />
 
         <EditText
             android:id="@+id/search_edit_text"
@@ -144,8 +154,8 @@
             android:hint="@string/search"
             android:imeOptions="actionSearch"
             android:inputType="text"
-            android:textColor="@color/blue_on_tertiary"
-            android:textColorHint="#808080"
+            android:textColor="?attr/colorPrimary"
+            android:textColorHint="?attr/colorPrimary"
             android:textSize="16sp" />
 
         <ImageButton
@@ -156,7 +166,7 @@
             android:contentDescription="@string/ok"
             android:padding="12dp"
             android:src="@drawable/ic_ok_v_24"
-            app:tint="@color/blue_on_tertiary" />
+            app:tint="?attr/colorPrimary" />
 
     </com.google.android.material.appbar.MaterialToolbar>
 
@@ -182,7 +192,7 @@
                     android:contentDescription="@string/tools"
                     android:padding="12dp"
                     android:src="@drawable/round_cases_24"
-                    app:tint="@color/blue_on_tertiary" />
+                    app:tint="?attr/colorPrimary" />
 
         <ImageButton
             android:id="@+id/metronome_button"
@@ -193,7 +203,7 @@
             android:padding="12dp"
             android:scaleType="centerInside"
             android:src="@drawable/metronome_svgrepo_com"
-            app:tint="@color/blue_on_tertiary"
+            app:tint="?attr/colorPrimary"
             tools:layout_editor_absoluteX="64dp" />
 
                 <ImageButton
@@ -204,8 +214,69 @@
                     android:contentDescription="@string/search"
                     android:padding="12dp"
                     android:src="@drawable/round_search_24"
-                    app:tint="@color/blue_on_tertiary" />
+                    app:tint="?attr/colorPrimary" />
             </com.google.android.material.appbar.MaterialToolbar>
+
+    <!-- Metronome overlay panel -->
+    <androidx.cardview.widget.CardView
+        android:id="@+id/metronome_panel"
+        android:layout_width="320dp"
+        android:layout_height="wrap_content"
+        android:visibility="gone"
+        app:cardUseCompatPadding="true"
+        app:cardCornerRadius="12dp"
+        app:cardElevation="8dp"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginTop="60dp"
+        android:layout_marginEnd="8dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="8dp">
+
+            <com.google.android.material.tabs.TabLayout
+                android:id="@+id/tab_layout_metronome"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content" />
+
+            <!-- Container that switches between tabs -->
+            <FrameLayout
+                android:id="@+id/metronome_tabs_container"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content">
+
+                <!-- Metronome tab content -->
+                <LinearLayout
+                    android:id="@+id/tab_content_metronome"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical">
+
+                    <FrameLayout
+                        android:id="@+id/metronome_view_container"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content" />
+                </LinearLayout>
+
+                <!-- Pitch tab content -->
+                <LinearLayout
+                    android:id="@+id/tab_content_pitch"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:visibility="gone"
+                    android:padding="8dp">
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/pitch" />
+                </LinearLayout>
+            </FrameLayout>
+        </LinearLayout>
+    </androidx.cardview.widget.CardView>
 
     <!-- Hidden PianoView to preload audio samples at app startup -->
     <FrameLayout
@@ -226,7 +297,7 @@
         android:id="@+id/content_container"
         android:layout_width="0dp"
         android:layout_height="0dp"
-        android:background="@color/blue_background"
+        android:background="?attr/colorSurface"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
@@ -236,7 +307,7 @@
         android:id="@+id/scrim_overlay"
         android:layout_width="0dp"
         android:layout_height="0dp"
-        android:background="@color/blue_on_surface"
+        android:background="?attr/colorPrimary"
         android:clickable="true"
         android:focusable="true"
         android:visibility="gone"
@@ -254,7 +325,7 @@
         android:layout_marginTop="60dp"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent"
-        android:background="@color/blue_background">
+        android:background="?attr/colorSurface">
 
         <!-- Header area with text buttons -->
         <LinearLayout
@@ -364,7 +435,7 @@
                 android:paddingTop="8dp"
                 android:paddingBottom="8dp"
                 android:text="@string/search_results"
-                android:textColor="@color/blue_on_surface"
+                android:textColor="?attr/colorPrimary"
                 android:textSize="14sp"
                 android:textStyle="bold"
                 android:visibility="gone" />
@@ -373,7 +444,7 @@
                 android:id="@+id/search_results_recycler"
                 android:layout_width="match_parent"
                 android:layout_height="150dp"
-                android:background="@android:color/white"
+                android:background="?attr/colorSurface"
                 android:clipToPadding="false"
                 android:padding="8dp"
                 android:visibility="gone" />
@@ -383,7 +454,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="0dp"
                 android:layout_weight="1"
-                android:background="@android:color/white"
+                android:background="?attr/colorSurface"
                 android:clipToPadding="false"
                 android:padding="8dp" />
         </LinearLayout>
@@ -393,7 +464,7 @@
             android:id="@+id/library_resize_handle"
             android:layout_width="match_parent"
             android:layout_height="8dp"
-            android:background="@color/blue_background" />
+            android:background="?attr/colorSurface" />
 
     </LinearLayout>
     <!-- Bookmarks Sidebar -->
@@ -401,7 +472,7 @@
         android:id="@+id/bookmarks_sidebar"
         android:layout_width="320dp"
         android:layout_height="0dp"
-        android:background="@color/blue_background"
+        android:background="?attr/colorSurface"
         android:elevation="8dp"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
@@ -426,7 +497,7 @@
                 android:gravity="center_vertical"
                 android:paddingStart="16dp"
                 android:text="@string/indexes"
-                android:textColor="@color/blue_on_surface"
+                android:textColor="?attr/colorPrimary"
                 android:textSize="18sp"
                 android:textStyle="bold"
                 tools:ignore="RtlSymmetry" />
@@ -439,7 +510,7 @@
                 android:contentDescription="@string/add"
                 android:padding="12dp"
                 android:src="@drawable/outline_edit_24"
-                app:tint="@color/blue_on_tertiary" />
+                app:tint="?attr/colorPrimary" />
 
             <ImageButton
                 android:id="@+id/edit_bookmarks_button"
@@ -449,7 +520,7 @@
                 android:contentDescription="@string/edit"
                 android:padding="12dp"
                 android:src="@drawable/round_edit_note_24"
-                app:tint="@color/blue_on_tertiary" />
+                app:tint="?attr/colorPrimary" />
         </LinearLayout>
 
         <TextView
@@ -459,7 +530,7 @@
             android:layout_marginStart="16dp"
             android:layout_marginTop="16dp"
             android:text="@string/bookmarks"
-            android:textColor="@color/blue_on_surface"
+            android:textColor="?attr/colorPrimary"
             android:textSize="14sp"
             android:textStyle="bold"
             app:layout_constraintStart_toStartOf="parent"
@@ -483,7 +554,7 @@
                 android:layout_marginEnd="4dp"
                 android:layout_weight="1"
                 android:text="@string/page"
-                android:textColor="@color/blue_on_surface" />
+                android:textColor="?attr/colorPrimary" />
 
             <Button
                 android:id="@+id/title_button"
@@ -492,7 +563,7 @@
                 android:layout_marginEnd="4dp"
                 android:layout_weight="1"
                 android:text="@string/title"
-                android:textColor="@color/blue_on_surface" />
+                android:textColor="?attr/colorPrimary" />
 
             <Button
                 android:id="@+id/flags_button"
@@ -501,7 +572,7 @@
                 android:layout_marginEnd="4dp"
                 android:layout_weight="1"
                 android:text="@string/flags"
-                android:textColor="@color/blue_on_surface" />
+                android:textColor="?attr/colorPrimary" />
 
             <Button
                 android:id="@+id/toc_button"
@@ -509,7 +580,7 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:text="@string/toc"
-                android:textColor="@color/blue_on_surface" />
+                android:textColor="?attr/colorPrimary" />
         </LinearLayout>
 
         <androidx.recyclerview.widget.RecyclerView
@@ -527,7 +598,7 @@
             android:id="@+id/bookmarks_resize_handle"
             android:layout_width="4dp"
             android:layout_height="0dp"
-            android:background="@color/blue_background"
+            android:background="?attr/colorSurface"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintTop_toTopOf="parent" />
@@ -538,7 +609,7 @@
         android:id="@+id/setlist_sidebar"
         android:layout_width="320dp"
         android:layout_height="0dp"
-        android:background="@color/blue_background"
+        android:background="?attr/colorSurface"
         android:elevation="8dp"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
@@ -563,7 +634,7 @@
                 android:gravity="center_vertical"
                 android:paddingStart="16dp"
                 android:text="@string/setlist"
-                android:textColor="@color/blue_on_surface"
+                android:textColor="?attr/colorPrimary"
                 android:textSize="18sp"
                 android:textStyle="bold" />
 
@@ -575,7 +646,7 @@
                 android:contentDescription="@string/add"
                 android:padding="12dp"
                 android:src="@drawable/round_add_24"
-                app:tint="@color/blue_on_tertiary" />
+                app:tint="?attr/colorPrimary" />
 
             <ImageButton
                 android:id="@+id/edit_setlist_button"
@@ -585,7 +656,7 @@
                 android:contentDescription="@string/edit"
                 android:padding="12dp"
                 android:src="@drawable/outline_edit_24"
-                app:tint="@color/blue_on_tertiary" />
+                app:tint="?attr/colorPrimary" />
         </LinearLayout>
 
         <TextView
@@ -595,7 +666,7 @@
             android:layout_marginStart="16dp"
             android:layout_marginTop="16dp"
             android:text="@string/setlist"
-            android:textColor="@color/blue_on_surface"
+            android:textColor="?attr/colorPrimary"
             android:textSize="14sp"
             android:textStyle="bold"
             app:layout_constraintStart_toStartOf="parent"
@@ -618,9 +689,9 @@
                 android:layout_height="wrap_content"
                 android:layout_marginEnd="4dp"
                 android:layout_weight="1"
-                android:backgroundTint="@color/blue_background"
+                android:backgroundTint="?attr/colorSurface"
                 android:text="@string/manual"
-                android:textColor="@color/blue_on_surface" />
+                android:textColor="?attr/colorPrimary" />
 
             <Button
                 android:id="@+id/setlist_title_button"
@@ -628,18 +699,18 @@
                 android:layout_height="wrap_content"
                 android:layout_marginEnd="4dp"
                 android:layout_weight="1"
-                android:backgroundTint="@color/blue_background"
+                android:backgroundTint="?attr/colorSurface"
                 android:text="@string/edit"
-                android:textColor="@color/blue_on_surface" />
+                android:textColor="?attr/colorPrimary" />
 
             <Button
                 android:id="@+id/fresh_button"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:backgroundTint="@color/blue_background"
+                android:backgroundTint="?attr/colorSurface"
                 android:text="@string/fresh"
-                android:textColor="@color/blue_on_surface" />
+                android:textColor="?attr/colorPrimary" />
         </LinearLayout>
 
         <androidx.recyclerview.widget.RecyclerView
@@ -657,7 +728,7 @@
             android:id="@+id/setlist_resize_handle"
             android:layout_width="4dp"
             android:layout_height="0dp"
-            android:background="@color/blue_background"
+            android:background="?attr/colorSurface"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintTop_toTopOf="parent" />
@@ -688,7 +759,7 @@
                 android:paddingStart="16dp"
                 android:paddingEnd="16dp"
                 android:text="@string/share_pdf"
-                android:textColor="@color/blue_on_surface"
+                android:textColor="?attr/colorPrimary"
                 android:textSize="16sp" />
 
             <TextView
@@ -699,7 +770,7 @@
                 android:paddingStart="16dp"
                 android:paddingEnd="16dp"
                 android:text="@string/page_properties"
-                android:textColor="@color/blue_on_surface"
+                android:textColor="?attr/colorPrimary"
                 android:textSize="16sp" />
 
             <TextView
@@ -710,7 +781,7 @@
                 android:paddingStart="16dp"
                 android:paddingEnd="16dp"
                 android:text="@string/show_in_library"
-                android:textColor="@color/blue_on_surface"
+                android:textColor="?attr/colorPrimary"
                 android:textSize="16sp" />
 
             <TextView
@@ -721,7 +792,7 @@
                 android:paddingStart="16dp"
                 android:paddingEnd="16dp"
                 android:text="@string/new_tab"
-                android:textColor="@color/blue_on_surface"
+                android:textColor="?attr/colorPrimary"
                 android:textSize="16sp" />
 
             <TextView
@@ -732,7 +803,7 @@
                 android:paddingStart="16dp"
                 android:paddingEnd="16dp"
                 android:text="@string/new_window"
-                android:textColor="@color/blue_on_surface"
+                android:textColor="?attr/colorPrimary"
                 android:textSize="16sp" />
 
             <TextView
@@ -743,7 +814,7 @@
                 android:paddingStart="16dp"
                 android:paddingEnd="16dp"
                 android:text="@string/add_to_setlist"
-                android:textColor="@color/blue_on_surface"
+                android:textColor="?attr/colorPrimary"
                 android:textSize="16sp" />
 
             <TextView
@@ -764,7 +835,7 @@
         android:id="@+id/tools_sidebar"
         android:layout_width="280dp"
         android:layout_height="0dp"
-        android:background="@color/blue_background"
+        android:background="?attr/colorSurface"
         android:elevation="8dp"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
@@ -798,7 +869,7 @@
             android:id="@+id/tools_resize_handle"
             android:layout_width="4dp"
             android:layout_height="0dp"
-            android:background="@color/blue_background"
+            android:background="?attr/colorSurface"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent" />
@@ -812,7 +883,7 @@
         android:layout_margin="32dp"
         android:visibility="gone"
         app:cardCornerRadius="10dp"
-        android:background="@color/blue_background"
+        app:cardBackgroundColor="?attr/colorSurface"
         app:cardElevation="8dp"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
@@ -831,7 +902,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="16dp"
                 android:text="@string/search"
-                android:textColor="@color/blue_on_surface"
+                android:textColor="?attr/colorPrimary"
                 android:textSize="18sp"
                 android:textStyle="bold" />
 
@@ -855,17 +926,17 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginEnd="8dp"
-                    android:backgroundTint="@color/blue_background"
+                    android:backgroundTint="?attr/colorSurface"
                     android:text="@string/cancel"
-                    android:textColor="@color/blue_on_surface" />
+                    android:textColor="?attr/colorPrimary" />
 
                 <Button
                     android:id="@+id/submit_search_button"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:backgroundTint="@color/blue_background"
+                    android:backgroundTint="?attr/colorSurface"
                     android:text="@string/search"
-                    android:textColor="@color/blue_on_surface" />
+                    android:textColor="?attr/colorPrimary" />
             </LinearLayout>
         </LinearLayout>
     </androidx.cardview.widget.CardView>

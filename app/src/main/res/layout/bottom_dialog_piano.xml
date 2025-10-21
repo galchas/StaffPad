@@ -12,7 +12,7 @@
         android:src="@drawable/round_remove_24"
         android:scaleType="centerCrop"
         android:layout_gravity="center"
-        app:tint="@color/blue_on_surface" />
+        app:tint="?attr/colorSecondary" />
     <LinearLayout
         android:padding="10dp"
         android:layout_width="match_parent"
@@ -23,7 +23,7 @@
             android:layout_width="60dp"
             android:layout_height="60dp"
             android:src="@drawable/round_fast_rewind_24"
-            app:tint="@color/blue_secondary"
+            app:tint="?attr/colorSecondary"
             android:layout_marginEnd="15dp"
             android:layout_marginStart="0dp"
             android:contentDescription="@string/left_button" />
@@ -45,7 +45,7 @@
             android:layout_height="60dp"
             android:contentDescription="@string/right_button"
             android:src="@drawable/round_fast_forward_24"
-            app:tint="@color/blue_secondary"
+            app:tint="?attr/colorSecondary"
             android:layout_marginEnd="10dp"
             android:layout_marginStart="15dp"/>
 

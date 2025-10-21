@@ -5,7 +5,7 @@
     android:orientation="horizontal"
     android:padding="8dp"
     android:id="@+id/library_navigation_header"
-    android:background="@android:color/white"
+    android:background="?attr/colorSurface"
     android:elevation="4dp">
 
     <ImageButton
@@ -15,7 +15,7 @@
         android:padding="8dp"
         android:src="@drawable/round_arrow_back_ios_24"
         android:background="?android:attr/selectableItemBackgroundBorderless"
-        android:contentDescription="Back" />
+        android:contentDescription="@string/back" />
 
     <TextView
         android:id="@+id/navigation_title"
@@ -27,6 +27,6 @@
         android:paddingEnd="8dp"
         android:textSize="16sp"
         android:textStyle="bold"
-        android:textColor="@android:color/black" />
+        android:textColor="?attr/colorPrimary" />
 
 </LinearLayout>

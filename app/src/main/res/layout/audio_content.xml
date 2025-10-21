@@ -27,7 +27,7 @@
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_marginTop="16dp"
-        android:background="#F5F5F5"
+        android:background="?attr/colorSurface"
         android:padding="8dp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
@@ -44,7 +44,7 @@
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent"
-            app:tint="#666666" />
+            app:tint="?attr/colorPrimary" />
 
         <TextView
             android:id="@+id/audio_control_title"
@@ -54,7 +54,7 @@
             android:layout_marginEnd="8dp"
             android:gravity="center"
             android:text="@string/attached_audio_files"
-            android:textColor="#333333"
+            android:textColor="?attr/colorPrimary"
             android:textSize="16sp"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toStartOf="@+id/add_audio_button"
@@ -72,7 +72,7 @@
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toStartOf="@+id/dismiss_audio_button"
             app:layout_constraintTop_toTopOf="parent"
-            app:tint="#666666" />
+            app:tint="?attr/colorPrimary" />
 
         <ImageButton
             android:id="@+id/dismiss_audio_button"
@@ -85,7 +85,7 @@
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintTop_toTopOf="parent"
-            app:tint="#666666" />
+            app:tint="?attr/colorPrimary" />
     </androidx.constraintlayout.widget.ConstraintLayout>
 
     <!-- YouTube link input row -->
@@ -104,14 +104,14 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:hint="Paste YouTube link"
+            android:hint="@string/paste_youtube_link"
             android:inputType="textUri" />
 
         <Button
             android:id="@+id/btn_add_link"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Add Link" />
+            android:text="@string/add_link" />
     </LinearLayout>
 
     <TextView
@@ -120,7 +120,7 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="12dp"
         android:text="@string/audio_files_associated_with_this_sheet"
-        android:textColor="#666666"
+        android:textColor="?attr/colorPrimary"
         android:textSize="14sp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"

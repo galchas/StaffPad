@@ -10,7 +10,7 @@
         android:layout_width="24dp"
         android:layout_height="24dp"
         android:src="@drawable/ic_info"
-        android:contentDescription="Library" />
+        android:contentDescription="@string/library" />
 
     <TextView
         android:id="@+id/library_name"

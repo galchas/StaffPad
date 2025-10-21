@@ -74,6 +74,9 @@ dependencies {
     //Piano View
     implementation(libs.pianoview)
 
+    //Metronome View
+    implementation(libs.metronome)
+
     //Stylus support
     implementation(libs.ink.authoring)
 }

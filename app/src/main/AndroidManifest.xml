@@ -16,7 +16,8 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:requestLegacyExternalStorage="true"
-        android:theme="@style/Theme.MusicReader.Blue">
+        android:theme="@style/Theme.MusicReader.Light"
+        tools:replace="android:label,android:name,android:theme">
     <activity
         android:name=".MainActivity"
         android:configChanges="keyboardHidden|orientation|screenSize"
@@ -29,16 +30,17 @@
             <category android:name="android.intent.category.LAUNCHER" />
         </intent-filter>
     </activity>
+
     <activity
         android:name=".CropActivity"
         android:configChanges="keyboardHidden|orientation|screenSize"
         android:exported="false"
-        android:theme="@style/Theme.MusicReader.Blue" />
+        android:theme="@style/Theme.MusicReader.Light" />
     <activity
         android:name=".RearrangePagesActivity"
         android:configChanges="keyboardHidden|orientation|screenSize"
         android:exported="false"
-        android:theme="@style/Theme.MusicReader.Blue" />
+        android:theme="@style/Theme.MusicReader.Light" />
 
     <provider
         android:name="androidx.core.content.FileProvider"

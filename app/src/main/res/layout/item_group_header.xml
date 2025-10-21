@@ -4,7 +4,7 @@
     android:layout_height="wrap_content"
     android:orientation="horizontal"
     android:padding="16dp"
-    android:background="@android:color/white"
+    android:background="?attr/colorSurface"
     android:elevation="2dp"
     android:clickable="true"
     android:focusable="true"
@@ -17,7 +17,7 @@
         android:layout_weight="1"
         android:textSize="18sp"
         android:textStyle="bold"
-        android:textColor="@android:color/black"/>
+        android:textColor="?attr/colorPrimary"/>
 
     <TextView
         android:id="@+id/group_count"

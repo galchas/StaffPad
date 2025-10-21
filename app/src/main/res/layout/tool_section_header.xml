@@ -12,10 +12,10 @@
         android:id="@+id/section_title"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:textColor="#606060"
+        android:textColor="?attr/colorSecondary"
         android:textStyle="bold"
         android:textSize="14sp"
-        android:text="Section" />
+        android:text="@string/section" />
 
     <View
         android:layout_width="match_parent"

@@ -4,7 +4,7 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:background="@color/blue_background"
+    android:background="?attr/colorSurface"
     android:minHeight="500dp">
 
     <!-- Header -->
@@ -15,7 +15,7 @@
         android:layout_marginStart="24dp"
         android:layout_marginTop="24dp"
         android:text="@string/metadata"
-        android:textColor="#333333"
+        android:textColor="?attr/colorPrimary"
         android:textSize="22sp"
         android:textStyle="bold" />
 
@@ -28,7 +28,7 @@
         android:layout_marginEnd="24dp"
         android:ellipsize="end"
         android:maxLines="1"
-        android:textColor="@color/blue_primary"
+        android:textColor="?attr/colorSecondary"
         android:textSize="16sp" />
 
     <!-- Tab Buttons -->
@@ -52,7 +52,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="@string/properties"
-                android:textColor="@color/blue_primary" />
+                android:textColor="?attr/colorPrimary" />
 
             <Button
                 android:id="@+id/setlist_button"
@@ -60,7 +60,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="@string/setlist"
-                android:textColor="@color/blue_primary" />
+                android:textColor="?attr/colorPrimary" />
 
             <Button
                 android:id="@+id/audio_button"
@@ -68,7 +68,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="@string/audio"
-                android:textColor="@color/blue_primary" />
+                android:textColor="?attr/colorPrimary" />
 
             <Button
                 android:id="@+id/libraries_button"
@@ -76,7 +76,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="@string/libraries"
-                android:textColor="@color/blue_primary" />
+                android:textColor="?attr/colorPrimary" />
         </LinearLayout>
     </HorizontalScrollView>
 

@@ -95,4 +95,37 @@
     <string name="metadata">Metadata</string>
     <string name="properties">Properties</string>
     <string name="libraries">Libraries</string>
+
+    <!-- Settings -->
+    <string name="settings">Settings</string>
+    <string name="settings_title">Settings</string>
+    <string name="theme_mode">Theme Mode</string>
+    <string name="theme_system">System default</string>
+    <string name="theme_light">Light</string>
+    <string name="theme_dark">Dark</string>
+    <string name="pitch">Pitch</string>
+    <string name="paste_youtube_link">Paste YouTube link</string>
+    <string name="add_link">Add Link</string>
+    <string name="delete_audio">Delete audio</string>
+    <string name="play_audio">Play audio</string>
+    <string name="drag_handle">Drag Handle</string>
+    <string name="library_name">Library Name</string>
+    <string name="description_optional">Description (optional)</string>
+    <string name="_0_sheets">0 sheets</string>
+    <string name="layer">Layer</string>
+    <string name="type">Type</string>
+    <string name="move_up">Move up</string>
+    <string name="move_down">Move down</string>
+    <string name="select_key">Select Key</string>
+    <string name="natural">Natural</string>
+    <string name="sharp">♯ (Sharp)</string>
+    <string name="flat">♭ (Flat)</string>
+    <string name="major">Major</string>
+    <string name="minor">Minor</string>
+    <string name="selected_key">Selected Key:</string>
+    <string name="c_major">C Major</string>
+    <string name="tune_details">Tune Details</string>
+    <string name="file_name">File name:</string>
+    <string name="select_the_setlists_to_include_this_sheet_in">Select the setlists to include this sheet in:</string>
+    <string name="section">Section</string>
 </resources>

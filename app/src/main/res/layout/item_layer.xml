@@ -24,14 +24,14 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:textStyle="bold"
-            android:text="Layer"
+            android:text="@string/layer"
             android:textSize="16sp"/>
 
         <TextView
             android:id="@+id/layer_type"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Type"
+            android:text="@string/type"
             android:textSize="12sp"/>
     </LinearLayout>
 
@@ -39,7 +39,7 @@
         android:id="@+id/button_up"
         android:layout_width="40dp"
         android:layout_height="40dp"
-        android:contentDescription="Move up"
+        android:contentDescription="@string/move_up"
         android:src="@drawable/round_arrow_back_ios_24"
         android:background="@android:color/transparent"/>
 
@@ -47,7 +47,7 @@
         android:id="@+id/button_down"
         android:layout_width="40dp"
         android:layout_height="40dp"
-        android:contentDescription="Move down"
+        android:contentDescription="@string/move_down"
         android:src="@drawable/round_arrow_forward_ios_24"
         android:background="@android:color/transparent"/>
 
@@ -55,7 +55,7 @@
         android:id="@+id/button_delete"
         android:layout_width="40dp"
         android:layout_height="40dp"
-        android:contentDescription="Delete"
+        android:contentDescription="@string/delete"
         android:src="@drawable/round_delete_forever_24"
         android:background="@android:color/transparent"/>
 
