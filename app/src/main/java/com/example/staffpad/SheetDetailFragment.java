@@ -47,6 +47,8 @@ import android.os.ParcelFileDescriptor;
 import android.graphics.pdf.PdfRenderer;
 import android.app.ActivityManager;
 import android.content.Context;
+import android.view.ViewConfiguration;
+import android.view.ViewParent;
 
 public class SheetDetailFragment extends Fragment {
     // Piano bottom dialog managed by this fragment for parity with player bottom dialog
@@ -287,25 +289,60 @@ public class SheetDetailFragment extends Fragment {
         View toolbar = annotationToolbar;
         AnnotationOverlayView overlay = annotationOverlay;
         if (toolbar != null && overlay != null) {
-            // Draggable toolbar (vertical drag only as per requirement)
-            toolbar.setOnTouchListener(new View.OnTouchListener() {
-                float dY;
-                @Override public boolean onTouch(View v2, android.view.MotionEvent e) {
-                    View parent = (View) v2.getParent();
-                    switch (e.getAction()) {
+            // Draggable toolbar via dedicated drag handles (start/end menu icons)
+            View dragStart = view.findViewById(R.id.drag_handle_start);
+            View dragEnd = view.findViewById(R.id.drag_handle_end);
+            View.OnTouchListener dragListener = new View.OnTouchListener() {
+                float dYInParent;
+                boolean dragging = false;
+                int touchSlop = ViewConfiguration.get(requireContext()).getScaledTouchSlop();
+                float downRawY;
+                @Override public boolean onTouch(View handle, android.view.MotionEvent e) {
+                    if (annotationToolbar == null) return false;
+                    View parent = (View) annotationToolbar.getParent();
+                    if (parent == null) return false;
+                    int[] parentLoc = new int[2];
+                    parent.getLocationOnScreen(parentLoc);
+                    float parentTopOnScreen = parentLoc[1];
+                    switch (e.getActionMasked()) {
                         case android.view.MotionEvent.ACTION_DOWN:
-                            dY = v2.getY() - e.getRawY();
+                            downRawY = e.getRawY();
+                            float downYInParent = downRawY - parentTopOnScreen;
+                            dYInParent = annotationToolbar.getY() - downYInParent;
+                            dragging = false;
+                            // We want to receive subsequent events
                             return true;
                         case android.view.MotionEvent.ACTION_MOVE:
-                            float newY = e.getRawY() + dY;
-                            newY = Math.max(0, Math.min(newY, parent.getHeight() - v2.getHeight()));
-                            v2.setY(newY);
-                            return true;
+                            float dy = Math.abs(e.getRawY() - downRawY);
+                            if (!dragging && dy > touchSlop) {
+                                dragging = true;
+                                android.view.ViewParent vp = parent.getParent();
+                                if (vp != null) vp.requestDisallowInterceptTouchEvent(true);
+                            }
+                            if (dragging) {
+                                float yInParent = e.getRawY() - parentTopOnScreen;
+                                float newY = yInParent + dYInParent;
+                                newY = Math.max(0, Math.min(newY, parent.getHeight() - annotationToolbar.getHeight()));
+                                annotationToolbar.setY(newY);
+                                return true;
+                            }
+                            return true; // continue tracking
+                        case android.view.MotionEvent.ACTION_UP:
+                        case android.view.MotionEvent.ACTION_CANCEL:
+                            if (dragging) {
+                                dragging = false;
+                                android.view.ViewParent vp2 = parent.getParent();
+                                if (vp2 != null) vp2.requestDisallowInterceptTouchEvent(false);
+                                return true;
+                            }
+                            return false; // let click fall through if it was just a tap
                         default:
                             return false;
                     }
                 }
-            });
+            };
+            if (dragStart != null) dragStart.setOnTouchListener(dragListener);
+            if (dragEnd != null) dragEnd.setOnTouchListener(dragListener);
             View btnText = view.findViewById(R.id.btn_tool_text);
             View btnPen = view.findViewById(R.id.btn_tool_pen);
             View btnEraser = view.findViewById(R.id.btn_tool_eraser);
@@ -622,10 +659,7 @@ public class SheetDetailFragment extends Fragment {
                 saveAnnotations(overlay);
             });
             btnClose.setOnClickListener(v -> {
-                overlay.setVisibility(View.GONE);
-                toolbar.setVisibility(View.GONE);
-                overlay.setMode(com.example.staffpad.views.AnnotationOverlayView.ToolMode.NONE);
-                if (photoView != null) photoView.setZoomable(true);
+                exitAnnotationMode();
             });
         }
 
@@ -2659,6 +2693,20 @@ public class SheetDetailFragment extends Fragment {
             toolbar.setVisibility(View.VISIBLE);
             overlay.setMode(com.example.staffpad.views.AnnotationOverlayView.ToolMode.PEN);
             if (photoView != null) photoView.setZoomable(false);
+            // Dismiss app bars/toolbars while annotation bar is visible
+            if (getActivity() != null) {
+                int[] ids = new int[] {
+                        R.id.app_toolbar,
+                        R.id.left_toolbar_buttons,
+                        R.id.center_toolbar,
+                        R.id.center_search_toolbar,
+                        R.id.right_toolbar_buttons
+                };
+                for (int id : ids) {
+                    View vbar = getActivity().findViewById(id);
+                    if (vbar != null) vbar.setVisibility(View.GONE);
+                }
+            }
             // Redraw base page without persisted annotations
             refreshPage();
             // Load last 20 ops from previous session if available
@@ -2676,6 +2724,26 @@ public class SheetDetailFragment extends Fragment {
             toolbar.setVisibility(View.GONE);
             overlay.setMode(com.example.staffpad.views.AnnotationOverlayView.ToolMode.NONE);
             if (photoView != null) photoView.setZoomable(true);
+            // Restore app bars/toolbars when exiting annotation mode
+            if (getActivity() != null) {
+                int[] ids = new int[] {
+                        R.id.app_toolbar,
+                        R.id.left_toolbar_buttons,
+                        R.id.center_toolbar,
+                        R.id.center_search_toolbar,
+                        R.id.right_toolbar_buttons
+                };
+                for (int id : ids) {
+                    View vbar = getActivity().findViewById(id);
+                    if (vbar != null) vbar.setVisibility(View.VISIBLE);
+                }
+            }
+            // If this sheet has associated audio, show the bottom player again
+            if (!playlist.isEmpty()) {
+                inflateBottomPlayerIfNeeded();
+                // Keep UI consistent: only show if we have tracks for this sheet
+                showBottomDialog();
+            }
             // Redraw with composited annotation layer visible again
             refreshPage();
         }

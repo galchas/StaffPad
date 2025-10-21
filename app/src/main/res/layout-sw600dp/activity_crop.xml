@@ -10,7 +10,7 @@
         android:id="@+id/toolbar"
         android:layout_width="0dp"
         android:layout_height="56dp"
-        android:background="#E1E1E9"
+        android:background="@color/blue_background"
         android:elevation="4dp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
@@ -73,7 +73,7 @@
 
             <com.google.android.material.slider.Slider
                 android:id="@+id/rotation_slider"
-                style="@style/Widget.MaterialComponents.Slider"
+                style="@style/Widget.Material3.Slider"
                 app:labelBehavior="gone"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
@@ -112,7 +112,7 @@
 
         <com.google.android.material.slider.Slider
             android:id="@+id/brightness_slider"
-            style="@style/Widget.MaterialComponents.Slider"
+            style="@style/Widget.Material3.Slider"
             app:labelBehavior="gone"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -134,7 +134,7 @@
 
         <com.google.android.material.slider.Slider
             android:id="@+id/contrast_slider"
-            style="@style/Widget.MaterialComponents.Slider"
+            style="@style/Widget.Material3.Slider"
             app:labelBehavior="gone"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -153,7 +153,7 @@
 
             <Button
                 android:id="@+id/cancel_button"
-                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                style="@style/Widget.Material3.Button.OutlinedButton"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="@string/cancel"
@@ -163,7 +163,7 @@
 
             <Button
                 android:id="@+id/restore_button"
-                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                style="@style/Widget.Material3.Button.OutlinedButton"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Restore"
@@ -172,11 +172,12 @@
                 app:strokeColor="#FFFFFF" />
 
             <Button
+                style="@style/Widget.Material3.Button"
                 android:id="@+id/apply_button"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="@string/apply"
-                android:backgroundTint="#4CAF50" />
+/>
         </LinearLayout>
 
     </LinearLayout>

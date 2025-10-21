@@ -11,7 +11,7 @@
         android:id="@+id/toolbar"
         android:layout_width="0dp"
         android:layout_height="56dp"
-        android:background="#1E1E1E"
+        android:background="@color/blue_background"
         android:elevation="4dp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
@@ -21,7 +21,6 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="@string/crop_amp_align_page"
-            android:textColor="#FFFFFF"
             android:textSize="18sp"
             android:textStyle="bold" />
     </androidx.appcompat.widget.Toolbar>
@@ -42,7 +41,7 @@
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:background="#1E1E1E"
+        android:background="@color/blue_background"
         android:padding="16dp"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
@@ -62,30 +61,26 @@
                 android:layout_height="40dp"
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:src="@drawable/round_arrow_back_ios_24"
-                android:contentDescription="@string/rotate_left"
-                app:tint="#FFFFFF" />
+                android:contentDescription="@string/rotate_left" />
 
             <TextView
                 android:id="@+id/rotation_label"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="@string/align_0"
-                android:textColor="#FFFFFF"
                 android:textSize="14sp"
                 android:layout_marginStart="12dp"
                 android:layout_marginEnd="12dp" />
 
             <com.google.android.material.slider.Slider
                 android:id="@+id/rotation_slider"
-                style="@style/Widget.MaterialComponents.Slider"
+                style="@style/Widget.Material3.Slider"
                 app:labelBehavior="gone"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:valueFrom="-10"
-                app:thumbStrokeColor="@color/purple_500"
                 android:valueTo="10"
-                app:trackColor="@color/purple_500"
                 android:stepSize="0.1" />
 
             <ImageButton
@@ -95,7 +90,7 @@
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:src="@drawable/round_arrow_forward_ios_24"
                 android:contentDescription="Rotate Right"
-                app:tint="#FFFFFF" />
+                 />
 
             <ImageButton
                 android:id="@+id/reset_button"
@@ -104,7 +99,7 @@
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:src="@drawable/round_close_24"
                 android:contentDescription="@string/reset"
-                app:tint="#FFFFFF" />
+               />
         </LinearLayout>
 
         <!-- Brightness control -->
@@ -113,20 +108,17 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="@string/brightness_0"
-            android:textColor="#FFFFFF"
             android:textSize="14sp"
             android:layout_marginBottom="4dp" />
 
         <com.google.android.material.slider.Slider
             android:id="@+id/brightness_slider"
-            style="@style/Widget.MaterialComponents.Slider"
+            style="@style/Widget.Material3.Slider"
             app:labelBehavior="gone"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:valueFrom="-100"
-            app:trackColor="@color/purple_500"
             android:valueTo="100"
-            app:thumbStrokeColor="@color/purple_500"
             android:stepSize="1"
             android:layout_marginBottom="16dp" />
 
@@ -136,21 +128,18 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="@string/contrast_1_00"
-            android:textColor="#FFFFFF"
             android:textSize="14sp"
             android:layout_marginBottom="4dp" />
 
         <com.google.android.material.slider.Slider
             android:id="@+id/contrast_slider"
-            style="@style/Widget.MaterialComponents.Slider"
+            style="@style/Widget.Material3.Slider"
             app:labelBehavior="gone"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:valueFrom="0.5"
             android:valueTo="2.0"
-            app:thumbStrokeColor="@color/purple_500"
             android:stepSize="0.01"
-            app:trackColor="@color/purple_500"
             android:layout_marginBottom="16dp" />
 
         <!-- Action buttons -->
@@ -166,9 +155,8 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="@string/cancel"
-                android:textColor="#FFFFFF"
                 android:layout_marginEnd="8dp"
-                app:strokeColor="#FFFFFF" />
+           />
 
             <Button
                 android:id="@+id/restore_button"
@@ -176,16 +164,13 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="@string/restore"
-                android:textColor="#FFFFFF"
-                android:layout_marginEnd="8dp"
-                app:strokeColor="#FFFFFF" />
+                android:layout_marginEnd="8dp" />
 
             <Button
                 android:id="@+id/apply_button"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="@string/apply"
-                android:backgroundTint="#4CAF50" />
+                android:text="@string/apply" />
         </LinearLayout>
 
     </LinearLayout>

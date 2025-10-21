@@ -34,8 +34,8 @@
         <com.google.android.material.slider.Slider
             android:id="@+id/widthSeek"
             style="@style/Widget.Material3.Slider"
-            app:trackColor="@color/purple_500"
             android:layout_width="match_parent"
+            app:thumbColor="@color/blue_secondary"
             android:layout_height="wrap_content"
             android:layout_marginBottom="8dp"
             app:thumbRadius="15dp" />
@@ -53,8 +53,8 @@
             style="@style/Widget.Material3.Slider"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            app:thumbColor="@color/blue_secondary"
             android:layout_marginBottom="12dp"
-            app:trackColor="@color/purple_500"
             app:thumbRadius="15dp" />
 
         <com.skydoves.colorpickerview.ColorPickerView

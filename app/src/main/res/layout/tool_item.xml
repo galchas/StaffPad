@@ -21,7 +21,7 @@
         android:scaleType="fitXY"
         android:scaleX="0.7"
         android:scaleY="0.7"
-        app:tint="@color/slider_thumb_color"
+        app:tint="@color/blue_secondary"
         tools:src="@drawable/pen_filled_writing_tool" />
 
     <TextView
