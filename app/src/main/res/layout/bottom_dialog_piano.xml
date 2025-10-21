@@ -23,7 +23,7 @@
             android:layout_width="60dp"
             android:layout_height="60dp"
             android:src="@drawable/round_fast_rewind_24"
-            app:tint="@color/slider_tick_color"
+            app:tint="#9B9898"
             android:layout_marginEnd="15dp"
             android:layout_marginStart="0dp"
             android:contentDescription="@string/left_button" />
@@ -45,7 +45,7 @@
             android:layout_height="60dp"
             android:contentDescription="@string/right_button"
             android:src="@drawable/round_fast_forward_24"
-            app:tint="@color/slider_tick_color"
+            app:tint="#9B9898"
             android:layout_marginEnd="10dp"
             android:layout_marginStart="15dp"/>
 

@@ -1206,11 +1206,15 @@ public class SheetDetailFragment extends Fragment {
 
     private void toggleUiChrome() {
         try {
-            // Toggle top app toolbar in activity
+            // Toggle top floating toolbars in activity
             androidx.fragment.app.FragmentActivity act = requireActivity();
-            View toolbar = act.findViewById(R.id.app_toolbar);
-            if (toolbar != null) {
-                toolbar.setVisibility(toolbar.getVisibility() == View.VISIBLE ? View.GONE : View.VISIBLE);
+            if (act instanceof MainActivity) {
+                ((MainActivity) act).toggleToolbarVisibility();
+            } else {
+                View toolbar = act.findViewById(R.id.app_toolbar);
+                if (toolbar != null) {
+                    toolbar.setVisibility(toolbar.getVisibility() == View.VISIBLE ? View.GONE : View.VISIBLE);
+                }
             }
         } catch (Throwable t) {
             Log.w(TAG, "toggleUiChrome: could not toggle app toolbar", t);
@@ -1229,9 +1233,13 @@ public class SheetDetailFragment extends Fragment {
     private void ensureToolbarVisible() {
         try {
             androidx.fragment.app.FragmentActivity act = requireActivity();
-            View toolbar = act.findViewById(R.id.app_toolbar);
-            if (toolbar != null && toolbar.getVisibility() != View.VISIBLE) {
-                toolbar.setVisibility(View.VISIBLE);
+            if (act instanceof MainActivity) {
+                ((MainActivity) act).ensureTopBarsVisible();
+            } else {
+                View toolbar = act.findViewById(R.id.app_toolbar);
+                if (toolbar != null && toolbar.getVisibility() != View.VISIBLE) {
+                    toolbar.setVisibility(View.VISIBLE);
+                }
             }
         } catch (Throwable t) {
             Log.w(TAG, "ensureToolbarVisible: failed", t);

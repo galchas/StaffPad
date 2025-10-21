@@ -117,6 +117,14 @@ public class MainActivity extends AppCompatActivity {
     private ImageButton metronomeButton;
     private ImageButton searchButton;
 
+    // Search UI
+    private View centerSearchToolbar;
+    private EditText searchEditText;
+    private ImageButton closeSearchButton;
+    private RecyclerView searchResultsRecycler;
+    private TextView searchResultsHeader;
+    private com.example.staffpad.adapters.SearchResultsAdapter searchResultsAdapter;
+
     // Dialogs
     private CardView pageOptionsMenu;
     private CardView searchDialog;
@@ -288,6 +296,37 @@ public class MainActivity extends AppCompatActivity {
         // Dialogs
         pageOptionsMenu = findViewById(R.id.page_options_menu);
         searchDialog = findViewById(R.id.search_dialog);
+
+        // Search UI views
+        centerSearchToolbar = findViewById(R.id.center_search_toolbar);
+        searchEditText = findViewById(R.id.search_edit_text);
+        closeSearchButton = findViewById(R.id.close_search_button);
+        searchResultsHeader = findViewById(R.id.search_results_header);
+        searchResultsRecycler = findViewById(R.id.search_results_recycler);
+        if (searchResultsRecycler != null) {
+            searchResultsRecycler.setLayoutManager(new LinearLayoutManager(this));
+            searchResultsAdapter = new com.example.staffpad.adapters.SearchResultsAdapter(this::onSheetItemClick);
+            searchResultsRecycler.setAdapter(searchResultsAdapter);
+        }
+        if (closeSearchButton != null) {
+            closeSearchButton.setOnClickListener(v -> exitSearchMode());
+        }
+        ImageButton okSearchButton = findViewById(R.id.ok_search_button);
+        if (okSearchButton != null) {
+            okSearchButton.setOnClickListener(v -> {
+                String q = searchEditText != null ? searchEditText.getText().toString() : "";
+                performSearch(q);
+                // Hide keyboard on OK press
+                android.view.inputmethod.InputMethodManager imm =
+                        (android.view.inputmethod.InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+                View current = getCurrentFocus();
+                if (imm != null && current != null) imm.hideSoftInputFromWindow(current.getWindowToken(), 0);
+            });
+        }
+        if (searchEditText != null) {
+            // Do not auto-search on editor action; results should appear only when OK is pressed
+            searchEditText.setOnEditorActionListener((v, actionId, event) -> false);
+        }
 
         // Setup top library menu buttons
         setupLibraryMenuButtons();
@@ -787,7 +826,7 @@ public class MainActivity extends AppCompatActivity {
         }
 
         // Get the layout that contains the RecyclerView
-        FrameLayout contentContainer = findViewById(R.id.library_content_container);
+        ViewGroup contentContainer = findViewById(R.id.library_content_container);
 
         // Check if it's valid
         if (contentContainer != null) {
@@ -853,7 +892,7 @@ public class MainActivity extends AppCompatActivity {
         }
 
         // 4. Create and show the back navigation header
-        FrameLayout contentContainer = findViewById(R.id.library_content_container);
+        ViewGroup contentContainer = findViewById(R.id.library_content_container);
 
         if (contentContainer != null) {
             // First, remove any existing headers
@@ -1060,7 +1099,7 @@ public class MainActivity extends AppCompatActivity {
             // Show metronome dialog or control
         });
 
-        searchButton.setOnClickListener(v -> toggleSearchDialog());
+        searchButton.setOnClickListener(v -> enterSearchMode());
 
         // Set up resize handles
         setupResizeHandles();
@@ -1633,16 +1672,49 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private void toggleToolbarVisibility() {
-        View toolbar = findViewById(R.id.app_toolbar);
+    public void toggleToolbarVisibility() {
+        View left = findViewById(R.id.left_toolbar_buttons);
+        View center = findViewById(R.id.center_toolbar);
+        View right = findViewById(R.id.right_toolbar_buttons);
+        View fallbackToolbar = findViewById(R.id.app_toolbar);
 
-        if (isToolbarVisible) {
-            toolbar.animate().translationY(-toolbar.getHeight()).setDuration(200);
-        } else {
-            toolbar.animate().translationY(0).setDuration(200);
+        if (left == null && center == null && right == null && fallbackToolbar != null) {
+            // Fallback to old single toolbar animation
+            if (isToolbarVisible) {
+                fallbackToolbar.animate().translationY(-fallbackToolbar.getHeight()).setDuration(200);
+            } else {
+                fallbackToolbar.animate().translationY(0).setDuration(200);
+            }
+            isToolbarVisible = !isToolbarVisible;
+            return;
         }
 
+        float target = isToolbarVisible ? -dp(64) : 0f;
+        if (left != null) left.animate().translationY(target).setDuration(200);
+        if (center != null) center.animate().translationY(target).setDuration(200);
+        if (right != null) right.animate().translationY(target).setDuration(200);
         isToolbarVisible = !isToolbarVisible;
+    }
+
+    public void ensureTopBarsVisible() {
+        View left = findViewById(R.id.left_toolbar_buttons);
+        View center = findViewById(R.id.center_toolbar);
+        View right = findViewById(R.id.right_toolbar_buttons);
+        View fallbackToolbar = findViewById(R.id.app_toolbar);
+
+        if (left == null && center == null && right == null && fallbackToolbar != null) {
+            fallbackToolbar.animate().translationY(0).setDuration(0);
+            isToolbarVisible = true;
+            return;
+        }
+        if (left != null) left.animate().translationY(0).setDuration(0);
+        if (center != null) center.animate().translationY(0).setDuration(0);
+        if (right != null) right.animate().translationY(0).setDuration(0);
+        isToolbarVisible = true;
+    }
+
+    private float dp(int dp) {
+        return dp * getResources().getDisplayMetrics().density;
     }
 
 
@@ -2316,6 +2388,109 @@ public class MainActivity extends AppCompatActivity {
             android.util.Log.e("MainActivity", "Error sharing file", e);
             android.widget.Toast.makeText(this, "Unable to share", android.widget.Toast.LENGTH_SHORT).show();
         }
+    }
+
+    // ===== Search Mode Handling =====
+    private void enterSearchMode() {
+        try {
+            View center = findViewById(R.id.center_toolbar);
+            if (center != null) center.setVisibility(View.GONE);
+            if (centerSearchToolbar != null) centerSearchToolbar.setVisibility(View.VISIBLE);
+
+            if (searchEditText != null) {
+                searchEditText.requestFocus();
+                android.view.inputmethod.InputMethodManager imm =
+                        (android.view.inputmethod.InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+                if (imm != null) imm.showSoftInput(searchEditText, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT);
+            }
+
+            // Ensure library sidebar is open to show results
+            if (currentSidebar == null || !"library".equals(currentSidebar)) {
+                toggleSidebar("library");
+            }
+        } catch (Throwable t) {
+            Log.e("MainActivity", "enterSearchMode failed", t);
+        }
+    }
+
+    private void exitSearchMode() {
+        try {
+            if (centerSearchToolbar != null) centerSearchToolbar.setVisibility(View.GONE);
+            View center = findViewById(R.id.center_toolbar);
+            if (center != null) center.setVisibility(View.VISIBLE);
+
+            // Clear text and results
+            if (searchEditText != null) searchEditText.setText("");
+            if (searchResultsHeader != null) searchResultsHeader.setVisibility(View.GONE);
+            if (searchResultsRecycler != null) searchResultsRecycler.setVisibility(View.GONE);
+            if (searchResultsAdapter != null) searchResultsAdapter.setItems(new ArrayList<>());
+
+            // Hide keyboard
+            View v = getCurrentFocus();
+            android.view.inputmethod.InputMethodManager imm =
+                    (android.view.inputmethod.InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+            if (imm != null && v != null) imm.hideSoftInputFromWindow(v.getWindowToken(), 0);
+        } catch (Throwable t) {
+            Log.e("MainActivity", "exitSearchMode failed", t);
+        }
+    }
+
+    private void performSearch(String query) {
+        final String q = query == null ? "" : query.trim();
+        if (q.isEmpty()) {
+            runOnUiThread(() -> {
+                if (searchResultsHeader != null) searchResultsHeader.setVisibility(View.GONE);
+                if (searchResultsRecycler != null) searchResultsRecycler.setVisibility(View.GONE);
+                if (searchResultsAdapter != null) searchResultsAdapter.setItems(new ArrayList<>());
+            });
+            return;
+        }
+
+        // Ensure library sidebar visible for results
+        runOnUiThread(() -> {
+            if (currentSidebar == null || !"library".equals(currentSidebar)) {
+                toggleSidebar("library");
+            }
+        });
+
+        AppDatabase.databaseWriteExecutor.execute(() -> {
+            try {
+                SheetMusicRepository repo = new SheetMusicRepository(getApplication());
+                List<com.example.staffpad.data_model.SheetMusic> all = repo.getAllSheetMusicWithRelationsSync();
+                String qLower = q.toLowerCase();
+                List<com.example.staffpad.data_model.SheetMusic> results = new ArrayList<>();
+                for (com.example.staffpad.data_model.SheetMusic s : all) {
+                    boolean match = false;
+                    if (!match && s.getTitle() != null && s.getTitle().toLowerCase().contains(qLower)) match = true;
+                    if (!match && s.getComposers() != null && s.getComposers().toLowerCase().contains(qLower)) match = true;
+                    if (!match && s.getLabels() != null && s.getLabels().toLowerCase().contains(qLower)) match = true;
+                    if (!match && s.getGenres() != null && s.getGenres().toLowerCase().contains(qLower)) match = true;
+                    if (!match && s.getTags() != null) {
+                        for (String tag : s.getTags()) {
+                            if (tag != null && tag.toLowerCase().contains(qLower)) { match = true; break; }
+                        }
+                    }
+                    if (match) results.add(s);
+                }
+
+                runOnUiThread(() -> {
+                    // Show header and list
+                    if (searchResultsHeader != null) {
+                        searchResultsHeader.setText("Search results (" + results.size() + ")");
+                        searchResultsHeader.setVisibility(View.VISIBLE);
+                    }
+                    if (searchResultsRecycler != null) {
+                        searchResultsRecycler.setVisibility(View.VISIBLE);
+                    }
+                    if (searchResultsAdapter != null) {
+                        searchResultsAdapter.setItems(results);
+                    }
+                });
+            } catch (Throwable t) {
+                Log.e("MainActivity", "performSearch failed", t);
+                runOnUiThread(() -> Toast.makeText(this, "Search failed", Toast.LENGTH_SHORT).show());
+            }
+        });
     }
 
 }

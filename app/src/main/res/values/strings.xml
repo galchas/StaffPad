@@ -88,4 +88,8 @@
     <string name="dissmiss_button">dissmiss button</string>
     <string name="left_button">left button</string>
     <string name="right_button">right button</string>
+    <string name="metronome">Metronome</string>
+    <string name="import_text">Import</string>
+    <string name="search_results">Search results</string>
+    <string name="ok">OK</string>
 </resources>

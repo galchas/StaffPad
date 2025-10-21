@@ -12,112 +12,175 @@
     <androidx.appcompat.widget.Toolbar
         android:id="@+id/app_toolbar"
         android:layout_width="0dp"
-        android:layout_height="56dp"
-        android:background="#E6F0F0F0"
-        android:elevation="2dp"
+        android:layout_height="0dp"
+        android:background="@android:color/transparent"
+        android:elevation="0dp"
         app:contentInsetStart="0dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <!-- Floating Left Toolbar (Material 3) -->
+    <com.google.android.material.appbar.MaterialToolbar
+        android:id="@+id/left_toolbar_buttons"
+        style="@style/Widget.Material3.Toolbar"
+        android:layout_width="wrap_content"
+        android:layout_height="?attr/actionBarSize"
+        android:layout_marginStart="8dp"
+        android:layout_marginTop="8dp"
+        android:backgroundTint="?attr/colorSurface"
+        android:elevation="6dp"
+        android:theme="@style/ThemeOverlay.Material3.ActionBar"
+        app:contentInsetStartWithNavigation="0dp"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <ImageButton
+            android:id="@+id/library_button"
+            android:layout_width="48dp"
+            android:layout_height="match_parent"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/library"
+            android:padding="12dp"
+            android:src="@drawable/baseline_menu_book_24"
+            app:tint="#404040" />
+
+        <ImageButton
+            android:id="@+id/bookmarks_button"
+            android:layout_width="48dp"
+            android:layout_height="match_parent"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/bookmarks"
+            android:padding="12dp"
+            android:src="@drawable/baseline_bookmark_24"
+            app:tint="#404040" />
+
+        <ImageButton
+            android:id="@+id/setlist_button"
+            android:layout_width="48dp"
+            android:layout_height="match_parent"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/setlist"
+            android:padding="12dp"
+            android:src="@drawable/baseline_format_list_bulleted_24"
+            app:tint="#404040" />
+    </com.google.android.material.appbar.MaterialToolbar>
+
+    <!-- Floating Center Toolbar (Material 3) -->
+    <com.google.android.material.appbar.MaterialToolbar
+        android:id="@+id/center_toolbar"
+        style="@style/Widget.Material3.Toolbar"
+        android:layout_width="wrap_content"
+        android:layout_height="?attr/actionBarSize"
+        android:layout_marginTop="8dp"
+        android:backgroundTint="?attr/colorSurface"
+        android:elevation="6dp"
+        android:theme="@style/ThemeOverlay.Material3.ActionBar"
+        app:contentInsetStartWithNavigation="0dp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent">
 
-        <androidx.constraintlayout.widget.ConstraintLayout
-            android:layout_width="match_parent"
-            android:layout_height="match_parent">
+        <TextView
+            android:id="@+id/display_mode"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/single_page"
+            android:textColor="#505050"
+            android:textSize="14sp" />
 
-            <!-- Left Side Toolbar Buttons -->
-            <LinearLayout
-                android:id="@+id/left_toolbar_buttons"
-                android:layout_width="wrap_content"
-                android:layout_height="match_parent"
-                android:orientation="horizontal"
-                app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintTop_toTopOf="parent">
+        <TextView
+            android:id="@+id/toolbar_title"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="12dp"
+            android:layout_marginEnd="8dp"
+            android:text="@string/sheet_title"
+            android:textColor="#404040"
+            android:textSize="18sp"
+            android:textStyle="normal" />
 
-                <ImageButton
-                    android:id="@+id/library_button"
-                    android:layout_width="48dp"
-                    android:layout_height="match_parent"
-                    android:background="?attr/selectableItemBackgroundBorderless"
-                    android:contentDescription="Library"
-                    android:padding="12dp"
-                    android:src="@drawable/baseline_menu_book_24"
-                    app:tint="#404040" />
+        <TextView
+            android:id="@+id/page_indicator"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/_1_12"
+            android:textColor="#505050"
+            android:textSize="14sp" />
+    </com.google.android.material.appbar.MaterialToolbar>
 
-                <ImageButton
-                    android:id="@+id/bookmarks_button"
-                    android:layout_width="48dp"
-                    android:layout_height="match_parent"
-                    android:background="?attr/selectableItemBackgroundBorderless"
-                    android:contentDescription="Bookmarks"
-                    android:padding="12dp"
-                    android:src="@drawable/baseline_bookmark_24"
-                    app:tint="#404040" />
+    <!-- Center Search Toolbar (Material 3) -->
+    <com.google.android.material.appbar.MaterialToolbar
+        android:id="@+id/center_search_toolbar"
+        style="@style/Widget.Material3.Toolbar"
+        android:layout_width="wrap_content"
+        android:layout_height="?attr/actionBarSize"
+        android:layout_marginTop="8dp"
+        android:backgroundTint="@color/slider_tick_color"
+        android:elevation="6dp"
+        android:visibility="gone"
 
-                <ImageButton
-                    android:id="@+id/setlist_button"
-                    android:layout_width="48dp"
-                    android:layout_height="match_parent"
-                    android:background="?attr/selectableItemBackgroundBorderless"
-                    android:contentDescription="Setlist"
-                    android:padding="12dp"
-                    android:src="@drawable/baseline_format_list_bulleted_24"
-                    app:tint="#404040" />
-            </LinearLayout>
+        android:theme="@style/ThemeOverlay.Material3.ActionBar"
+        app:contentInsetStartWithNavigation="0dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
 
-            <!-- Center Toolbar Section -->
-            <LinearLayout
-                android:id="@+id/center_toolbar"
-                android:layout_width="wrap_content"
-                android:layout_height="match_parent"
-                android:gravity="center"
-                android:orientation="horizontal"
-                app:layout_constraintEnd_toEndOf="parent"
-                app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintTop_toTopOf="parent">
+        <ImageButton
+            android:id="@+id/close_search_button"
+            android:layout_width="48dp"
+            android:layout_height="match_parent"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/cancel"
+            android:padding="12dp"
+            android:src="@drawable/round_close_24"
+            app:tint="#404040" />
 
-                <TextView
-                    android:id="@+id/display_mode"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/single_page"
-                    android:textColor="#505050"
-                    android:textSize="14sp" />
+        <EditText
+            android:id="@+id/search_edit_text"
+            android:layout_width="200dp"
+            android:layout_height="match_parent"
+            android:background="@android:color/transparent"
+            android:hint="@string/search"
+            android:imeOptions="actionSearch"
+            android:inputType="text"
+            android:textColor="#404040"
+            android:textColorHint="#808080"
+            android:textSize="16sp" />
 
-                <TextView
-                    android:id="@+id/toolbar_title"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="12dp"
-                    android:layout_marginEnd="8dp"
-                    android:text="@string/sheet_title"
-                    android:textColor="#404040"
-                    android:textSize="18sp"
-                    android:textStyle="normal" />
+        <ImageButton
+            android:id="@+id/ok_search_button"
+            android:layout_width="48dp"
+            android:layout_height="match_parent"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/ok"
+            android:padding="12dp"
+            android:src="@drawable/ic_ok_v_24"
+            app:tint="#404040" />
 
-                <TextView
-                    android:id="@+id/page_indicator"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/_1_12"
-                    android:textColor="#505050"
-                    android:textSize="14sp" />
-            </LinearLayout>
+    </com.google.android.material.appbar.MaterialToolbar>
 
-            <!-- Right Side Toolbar Buttons -->
-            <LinearLayout
-                android:id="@+id/right_toolbar_buttons"
-                android:layout_width="wrap_content"
-                android:layout_height="match_parent"
-                android:orientation="horizontal"
-                app:layout_constraintEnd_toEndOf="parent"
-                app:layout_constraintTop_toTopOf="parent">
+    <!-- Floating Right Toolbar (Material 3) -->
+    <com.google.android.material.appbar.MaterialToolbar
+        android:id="@+id/right_toolbar_buttons"
+        style="@style/Widget.Material3.Toolbar"
+        android:layout_width="wrap_content"
+        android:layout_height="?attr/actionBarSize"
+        android:layout_marginEnd="8dp"
+        android:layout_marginTop="8dp"
+        android:backgroundTint="?attr/colorSurface"
+        android:elevation="6dp"
+        android:theme="@style/ThemeOverlay.Material3.ActionBar"
+        app:contentInsetStartWithNavigation="0dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
 
                 <ImageButton
                     android:id="@+id/tools_button"
                     android:layout_width="48dp"
                     android:layout_height="match_parent"
                     android:background="?attr/selectableItemBackgroundBorderless"
-                    android:contentDescription="Tools"
+                    android:contentDescription="@string/tools"
                     android:padding="12dp"
                     android:src="@drawable/round_cases_24"
                     app:tint="#404040" />
@@ -127,9 +190,9 @@
                     android:layout_width="48dp"
                     android:layout_height="match_parent"
                     android:background="?attr/selectableItemBackgroundBorderless"
-                    android:contentDescription="Metronome"
+                    android:contentDescription="@string/metronome"
                     android:padding="12dp"
-                    android:src="@drawable/baseline_metronome_temp"
+                    android:src="@drawable/metronome_svgrepo_com"
                     app:tint="#404040" />
 
                 <ImageButton
@@ -137,13 +200,11 @@
                     android:layout_width="48dp"
                     android:layout_height="match_parent"
                     android:background="?attr/selectableItemBackgroundBorderless"
-                    android:contentDescription="Search"
+                    android:contentDescription="@string/search"
                     android:padding="12dp"
                     android:src="@drawable/round_search_24"
                     app:tint="#404040" />
-            </LinearLayout>
-        </androidx.constraintlayout.widget.ConstraintLayout>
-    </androidx.appcompat.widget.Toolbar>
+            </com.google.android.material.appbar.MaterialToolbar>
 
     <!-- Hidden PianoView to preload audio samples at app startup -->
     <FrameLayout
@@ -212,7 +273,7 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="Library"
+                    android:text="@string/library"
                     android:textSize="16sp"
                     android:gravity="center"
                     android:padding="8dp" />
@@ -222,7 +283,7 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="Import"
+                    android:text="@string/import_text"
                     android:textSize="16sp"
                     android:gravity="center"
                     android:padding="8dp" />
@@ -232,7 +293,7 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="Edit"
+                    android:text="@string/edit"
                     android:textSize="16sp"
                     android:gravity="center"
                     android:padding="8dp" />
@@ -250,7 +311,7 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="Composers"
+                    android:text="@string/composers"
                     android:textSize="12sp" />
 
                 <Button
@@ -258,7 +319,7 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="Genres"
+                    android:text="@string/genres"
                     android:textSize="12sp" />
             </LinearLayout>
 
@@ -273,7 +334,7 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="Tags"
+                    android:text="@string/tags"
                     android:textSize="12sp" />
 
                 <Button
@@ -281,26 +342,50 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="Labels"
+                    android:text="@string/labels"
                     android:textSize="12sp" />
             </LinearLayout>
         </LinearLayout>
 
-        <FrameLayout
+        <LinearLayout
             android:id="@+id/library_content_container"
             android:layout_width="match_parent"
             android:layout_height="0dp"
-            android:layout_weight="1">
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/search_results_header"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp"
+                android:paddingTop="8dp"
+                android:paddingBottom="8dp"
+                android:text="@string/search_results"
+                android:textColor="#606060"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:visibility="gone" />
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/search_results_recycler"
+                android:layout_width="match_parent"
+                android:layout_height="150dp"
+                android:background="@android:color/white"
+                android:clipToPadding="false"
+                android:padding="8dp"
+                android:visibility="gone" />
 
             <androidx.recyclerview.widget.RecyclerView
                 android:id="@+id/library_recycler_view"
                 android:layout_width="match_parent"
-                android:layout_height="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
                 android:background="@android:color/white"
                 android:clipToPadding="false"
-                android:padding="8dp"
-                android:layout_marginTop="60dp"/>
-        </FrameLayout>
+                android:padding="8dp" />
+        </LinearLayout>
 
         <!-- Resize handle -->
         <View
@@ -729,7 +814,8 @@
         android:layout_height="wrap_content"
         android:layout_margin="32dp"
         android:visibility="gone"
-        app:cardCornerRadius="8dp"
+        app:cardCornerRadius="10dp"
+        android:background="@color/slider_tick_color"
         app:cardElevation="8dp"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"

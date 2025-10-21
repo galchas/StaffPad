@@ -12,5 +12,11 @@
         <!-- Status bar color. -->
         <item name="android:statusBarColor">?attr/colorPrimaryVariant</item>
         <!-- Customize your theme here. -->
+
+    </style>
+    <!-- Corrected parent name for toolbar style (if needed elsewhere) -->
+    <style name="ToolbarShapeAppearance" parent="Widget.Material3.Toolbar">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">20dp</item>
     </style>
 </resources>
