@@ -1,6 +1,7 @@
 [versions]
 agp = "8.6.1"
 colorpickerview = "2.3.0"
+inkAuthoring = "1.0.0-alpha07"
 junit = "4.13.2"
 junitVersion = "1.3.0"
 espressoCore = "3.7.0"
@@ -18,6 +19,7 @@ androidyoutubeplayer = "13.0.0"
 [libraries]
 androidyoutubeplayercore = { module = "com.pierfrancescosoffritti.androidyoutubeplayer:core", version.ref = "androidyoutubeplayer" }
 colorpickerview = { module = "com.github.skydoves:colorpickerview", version.ref = "colorpickerview" }
+ink-authoring = { module = "androidx.ink:ink-authoring", version.ref = "inkAuthoring" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 ext-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }
 espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }

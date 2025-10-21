@@ -29,6 +29,11 @@ public class AnnotationOverlayView extends View {
 
     public enum ToolMode { NONE, PEN, ERASER, TEXT }
 
+    // Stylus/Jetpack Ink integration flags (no hard dependency; graceful fallback)
+    private boolean inkEnabled = true; // default on for better pens
+    private boolean stylusInUse = false;
+    private boolean tempEraserFromButton = false;
+
     public static abstract class AnnotationItem {
         public abstract void draw(Canvas c);
         public abstract boolean hitTest(float x, float y);
@@ -246,9 +251,34 @@ public class AnnotationOverlayView extends View {
 
     @Override
     public boolean onTouchEvent(MotionEvent event) {
-        float x = event.getX();
-        float y = event.getY();
-        switch (mode) {
+        // Prefer stylus pointer when present
+        int stylusIndex = findStylusPointerIndex(event);
+        boolean hasStylus = stylusIndex >= 0;
+        if (hasStylus) {
+            stylusInUse = event.getActionMasked() != MotionEvent.ACTION_UP && event.getActionMasked() != MotionEvent.ACTION_CANCEL;
+        } else {
+            // If a stylus is currently in proximity (tracked by previous events), ignore finger input for palm rejection
+            if (stylusInUse && event.getToolType(0) == MotionEvent.TOOL_TYPE_FINGER) {
+                return false;
+            }
+        }
+        float x = event.getX(hasStylus ? stylusIndex : 0);
+        float y = event.getY(hasStylus ? stylusIndex : 0);
+
+        // Stylus button handling: primary button acts as temporary eraser
+        if (hasStylus) {
+            int buttons = event.getButtonState();
+            boolean primaryPressed = (buttons & MotionEvent.BUTTON_STYLUS_PRIMARY) != 0;
+            if (primaryPressed && !tempEraserFromButton && mode == ToolMode.PEN) {
+                tempEraserFromButton = true;
+            } else if (!primaryPressed && tempEraserFromButton) {
+                // Release temporary eraser when button is released
+                tempEraserFromButton = false;
+            }
+        }
+
+        ToolMode effectiveMode = (tempEraserFromButton ? ToolMode.ERASER : mode);
+        switch (effectiveMode) {
             case PEN:
                 handlePenTouch(event, x, y);
                 return true;
@@ -263,38 +293,66 @@ public class AnnotationOverlayView extends View {
     }
 
     private void handlePenTouch(MotionEvent event, float x, float y) {
-        if (event.getAction() == MotionEvent.ACTION_DOWN) {
+        int pointerIndex = findStylusPointerIndex(event);
+        if (pointerIndex < 0) pointerIndex = 0;
+        int action = event.getActionMasked();
+        if (action == MotionEvent.ACTION_DOWN) {
             currentStroke = new Stroke(penColor, penWidthPx, penAlpha);
+            // Adjust width subtly by pressure when stylus-enabled
+            if (inkEnabled) {
+                try {
+                    float pressure = event.getPressure(pointerIndex);
+                    pressure = Math.max(0.1f, Math.min(pressure, 1.5f));
+                    currentStroke.paint.setStrokeWidth(Math.max(1f, penWidthPx * (0.6f + 0.4f * pressure)));
+                } catch (Throwable ignore) {}
+            }
             currentStroke.addPoint(x, y, true);
             redoStack.clear();
-        } else if (event.getAction() == MotionEvent.ACTION_MOVE) {
+        } else if (action == MotionEvent.ACTION_MOVE) {
             if (currentStroke != null) {
+                // use historical points for smoothing
+                if (inkEnabled) addHistoricalPointsToStroke(currentStroke, event, pointerIndex);
                 currentStroke.addPoint(x, y, false);
             }
-        } else if (event.getAction() == MotionEvent.ACTION_UP || event.getAction() == MotionEvent.ACTION_CANCEL) {
+        } else if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
             if (currentStroke != null) {
+                if (inkEnabled) addHistoricalPointsToStroke(currentStroke, event, pointerIndex);
                 currentStroke.addPoint(x, y, false);
                 items.add(currentStroke);
                 currentStroke = null;
+            }
+            // Stylus ended; allow fingers again
+            if (event.getToolType(pointerIndex) == MotionEvent.TOOL_TYPE_STYLUS) {
+                stylusInUse = false;
+                tempEraserFromButton = false;
             }
         }
         invalidate();
     }
 
     private void handleEraserTouch(MotionEvent event, float x, float y) {
-        if (event.getAction() == MotionEvent.ACTION_DOWN) {
+        int pointerIndex = findStylusPointerIndex(event);
+        if (pointerIndex < 0) pointerIndex = 0;
+        int action = event.getActionMasked();
+        if (action == MotionEvent.ACTION_DOWN) {
             currentErase = new EraseStroke(eraserWidthPx);
             currentErase.addPoint(x, y, true);
             redoStack.clear();
-        } else if (event.getAction() == MotionEvent.ACTION_MOVE) {
+        } else if (action == MotionEvent.ACTION_MOVE) {
             if (currentErase != null) {
+                if (inkEnabled) addHistoricalPointsToErase(currentErase, event, pointerIndex);
                 currentErase.addPoint(x, y, false);
             }
-        } else if (event.getAction() == MotionEvent.ACTION_UP || event.getAction() == MotionEvent.ACTION_CANCEL) {
+        } else if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
             if (currentErase != null) {
+                if (inkEnabled) addHistoricalPointsToErase(currentErase, event, pointerIndex);
                 currentErase.addPoint(x, y, false);
                 items.add(currentErase);
                 currentErase = null;
+            }
+            if (event.getToolType(pointerIndex) == MotionEvent.TOOL_TYPE_STYLUS) {
+                stylusInUse = false;
+                tempEraserFromButton = false;
             }
         }
         invalidate();
@@ -387,6 +445,37 @@ public class AnnotationOverlayView extends View {
             }
         }
         invalidate();
+    }
+
+    // --- Stylus helpers and Jetpack Ink (reflection-ready) ---
+    private int findStylusPointerIndex(MotionEvent e) {
+        int pc = e.getPointerCount();
+        for (int i = 0; i < pc; i++) {
+            if (e.getToolType(i) == MotionEvent.TOOL_TYPE_STYLUS) return i;
+        }
+        return -1;
+    }
+
+    public void setInkEnabled(boolean enabled) { this.inkEnabled = enabled; }
+
+    private void addHistoricalPointsToStroke(Stroke s, MotionEvent e, int pointerIndex) {
+        if (s == null) return;
+        final int hs = e.getHistorySize();
+        for (int i = 0; i < hs; i++) {
+            float hx = e.getHistoricalX(pointerIndex, i);
+            float hy = e.getHistoricalY(pointerIndex, i);
+            s.addPoint(hx, hy, false);
+        }
+    }
+
+    private void addHistoricalPointsToErase(EraseStroke s, MotionEvent e, int pointerIndex) {
+        if (s == null) return;
+        final int hs = e.getHistorySize();
+        for (int i = 0; i < hs; i++) {
+            float hx = e.getHistoricalX(pointerIndex, i);
+            float hy = e.getHistoricalY(pointerIndex, i);
+            s.addPoint(hx, hy, false);
+        }
     }
 
     private static float spToPx(float sp) {

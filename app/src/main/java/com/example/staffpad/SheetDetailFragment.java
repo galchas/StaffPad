@@ -2714,6 +2714,7 @@ public class SheetDetailFragment extends Fragment {
             overlay.setVisibility(View.VISIBLE);
             toolbar.setVisibility(View.VISIBLE);
             overlay.setMode(com.example.staffpad.views.AnnotationOverlayView.ToolMode.PEN);
+            try { overlay.setInkEnabled(true); } catch (Throwable ignore) {}
             if (photoView != null) photoView.setZoomable(false);
             // Dismiss app bars/toolbars while annotation bar is visible
             if (getActivity() != null) {
@@ -2745,6 +2746,7 @@ public class SheetDetailFragment extends Fragment {
             overlay.setVisibility(View.GONE);
             toolbar.setVisibility(View.GONE);
             overlay.setMode(com.example.staffpad.views.AnnotationOverlayView.ToolMode.NONE);
+            try { overlay.setInkEnabled(false); } catch (Throwable ignore) {}
             if (photoView != null) photoView.setZoomable(true);
             // Restore app bars/toolbars when exiting annotation mode
             if (getActivity() != null) {

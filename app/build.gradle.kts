@@ -73,4 +73,7 @@ dependencies {
 
     //Piano View
     implementation(libs.pianoview)
+
+    //Stylus support
+    implementation(libs.ink.authoring)
 }
