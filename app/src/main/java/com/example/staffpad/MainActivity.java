@@ -317,11 +317,25 @@ public class MainActivity extends AppCompatActivity {
                         (android.view.inputmethod.InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
                 View current = getCurrentFocus();
                 if (imm != null && current != null) imm.hideSoftInputFromWindow(current.getWindowToken(), 0);
+                // Exit search mode after approving search
+                exitSearchMode();
             });
         }
         if (searchEditText != null) {
-            // Do not auto-search on editor action; results should appear only when OK is pressed
-            searchEditText.setOnEditorActionListener((v, actionId, event) -> false);
+            // Approve search from keyboard action and exit search mode
+            searchEditText.setOnEditorActionListener((v, actionId, event) -> {
+                if (actionId == android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH) {
+                    String q = v.getText() != null ? v.getText().toString() : "";
+                    performSearch(q);
+                    // Hide keyboard
+                    android.view.inputmethod.InputMethodManager imm =
+                            (android.view.inputmethod.InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+                    if (imm != null) imm.hideSoftInputFromWindow(v.getWindowToken(), 0);
+                    exitSearchMode();
+                    return true;
+                }
+                return false;
+            });
         }
 
         // Setup top library menu buttons

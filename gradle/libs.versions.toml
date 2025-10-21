@@ -11,7 +11,7 @@ constraintlayoutCore = "1.1.1"
 navVersion = "2.9.5"
 pdfboxAndroid = "2.0.27.0"
 photoview = "2.3.0"
-pianoview = "1.1.4"
+pianoview = "1.1.5"
 roomVersion = "2.8.2"
 androidyoutubeplayer = "13.0.0"
 

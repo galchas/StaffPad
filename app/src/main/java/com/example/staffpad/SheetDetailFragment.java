@@ -1814,7 +1814,29 @@ public class SheetDetailFragment extends Fragment {
 
     private void hideBottomDialog() {
         if (bottomPlayerContainer == null) return;
+        // Hide the player UI
         bottomPlayerContainer.setVisibility(View.GONE);
+        // Also clear any residual bottom padding that may act like a placeholder,
+        // so the sheet content can use full screen height.
+        try {
+            View root = getView();
+            if (root != null) {
+                // Clear bottom padding on this fragment root
+                if (root.getPaddingBottom() != 0) {
+                    root.setPadding(root.getPaddingLeft(), root.getPaddingTop(), root.getPaddingRight(), 0);
+                    root.requestLayout();
+                }
+                // Clear bottom padding on parent container if any
+                ViewParent parent = root.getParent();
+                if (parent instanceof View) {
+                    View pView = (View) parent;
+                    if (pView.getPaddingBottom() != 0) {
+                        pView.setPadding(pView.getPaddingLeft(), pView.getPaddingTop(), pView.getPaddingRight(), 0);
+                        pView.requestLayout();
+                    }
+                }
+            }
+        } catch (Throwable ignore) {}
     }
 
     public void dismissAndStopPlayer() {

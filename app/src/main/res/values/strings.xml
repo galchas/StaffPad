@@ -92,4 +92,7 @@
     <string name="import_text">Import</string>
     <string name="search_results">Search results</string>
     <string name="ok">OK</string>
+    <string name="metadata">Metadata</string>
+    <string name="properties">Properties</string>
+    <string name="libraries">Libraries</string>
 </resources>

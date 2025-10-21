@@ -4,7 +4,7 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:background="@drawable/bottom_sheet_background"
+    android:background="@color/blue_background"
     android:minHeight="500dp">
 
     <!-- Header -->
@@ -14,7 +14,7 @@
         android:layout_height="wrap_content"
         android:layout_marginStart="24dp"
         android:layout_marginTop="24dp"
-        android:text="Metadata"
+        android:text="@string/metadata"
         android:textColor="#333333"
         android:textSize="22sp"
         android:textStyle="bold" />
@@ -28,7 +28,7 @@
         android:layout_marginEnd="24dp"
         android:ellipsize="end"
         android:maxLines="1"
-        android:textColor="#666666"
+        android:textColor="@color/blue_primary"
         android:textSize="16sp" />
 
     <!-- Tab Buttons -->
@@ -51,32 +51,32 @@
                 style="@style/Widget.MaterialComponents.Button.TextButton"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Properties"
-                android:textColor="#333333" />
+                android:text="@string/properties"
+                android:textColor="@color/blue_primary" />
 
             <Button
                 android:id="@+id/setlist_button"
                 style="@style/Widget.MaterialComponents.Button.TextButton"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Setlist"
-                android:textColor="#666666" />
+                android:text="@string/setlist"
+                android:textColor="@color/blue_primary" />
 
             <Button
                 android:id="@+id/audio_button"
                 style="@style/Widget.MaterialComponents.Button.TextButton"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Audio"
-                android:textColor="#666666" />
+                android:text="@string/audio"
+                android:textColor="@color/blue_primary" />
 
             <Button
                 android:id="@+id/libraries_button"
                 style="@style/Widget.MaterialComponents.Button.TextButton"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Libraries"
-                android:textColor="#666666" />
+                android:text="@string/libraries"
+                android:textColor="@color/blue_primary" />
         </LinearLayout>
     </HorizontalScrollView>
 
