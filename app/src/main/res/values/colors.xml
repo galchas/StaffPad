@@ -1,5 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- Classic Theme - Traditional Black on White -->
+    <color name="classic_background">#FFFFFF</color>
+    <color name="classic_surface">#FFFFFF</color>
+    <color name="classic_primary">#000000</color>
+    <color name="classic_on_primary">#FFFFFF</color>
+    <color name="classic_secondary">#6B7280</color>
+    <color name="classic_on_secondary">#FFFFFF</color>
+    <color name="classic_tertiary">#E5E7EB</color>
+    <color name="classic_on_tertiary">#000000</color>
+    <color name="classic_error">#BA1A1A</color>
+    <color name="classic_on_error">#FFFFFF</color>
+    <color name="classic_outline">#E5E7EB</color>
+    <color name="classic_surface_variant">#F5F5F5</color>
+    <color name="classic_on_surface_variant">#6B7280</color>
+    <color name="classic_on_surface">#000000</color>
+    <color name="classic_on_background">#000000</color>
+
+    <!-- Blue Theme - Cool, Eye Strain Reducing -->
     <color name="blue_background">#F0F4F8</color>
     <color name="blue_surface">#F0F4F8</color>
     <color name="blue_primary">#1E293B</color>
@@ -16,6 +34,11 @@
     <color name="blue_on_surface">#1E293B</color>
     <color name="blue_on_background">#1E293B</color>
 
+    <!-- Staff and Notation Colors -->
+    <color name="blue_staff_line">#1E293B</color>
+    <color name="blue_note">#1E293B</color>
+    <color name="blue_measure_line">#1E293B</color>
+    <color name="blue_accent_note">#2563EB</color>
 
     <color name="night_background">#1A1A1A</color>
     <color name="night_surface">#1A1A1A</color>

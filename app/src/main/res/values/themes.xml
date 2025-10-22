@@ -1,36 +1,87 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
     <!-- Base application theme using Material3 DayNight to support light/dark -->
-    <style name="Theme.MusicReader.Light" parent="Theme.Material3.Light.NoActionBar">
-        <item name="colorPrimary">@color/blue_primary</item>
-        <item name="colorOnPrimary">@color/blue_on_primary</item>
-        <item name="colorPrimaryContainer">@color/blue_tertiary</item>
-        <item name="colorOnPrimaryContainer">@color/blue_on_tertiary</item>
+    <!-- Classic Theme - Traditional Black on White -->
+    <style name="Base.Theme.MusicReader" parent="Theme.Material3.Light.NoActionBar">
+        <item name="colorPrimary">@color/classic_primary</item>
+        <item name="colorOnPrimary">@color/classic_on_primary</item>
+        <item name="colorPrimaryContainer">@color/classic_tertiary</item>
+        <item name="colorOnPrimaryContainer">@color/classic_on_tertiary</item>
 
-        <item name="colorSecondary">@color/blue_secondary</item>
-        <item name="colorOnSecondary">@color/blue_on_secondary</item>
-        <item name="colorSecondaryContainer">@color/blue_surface_variant</item>
-        <item name="colorOnSecondaryContainer">@color/blue_on_surface_variant</item>
+        <!-- Secondary colors -->
+        <item name="colorSecondary">@color/classic_secondary</item>
+        <item name="colorOnSecondary">@color/classic_on_secondary</item>
+        <item name="colorSecondaryContainer">@color/classic_surface_variant</item>
+        <item name="colorOnSecondaryContainer">@color/classic_on_surface_variant</item>
 
-        <item name="colorTertiary">@color/blue_tertiary</item>
-        <item name="colorOnTertiary">@color/blue_on_tertiary</item>
+        <!-- Tertiary colors -->
+        <item name="colorTertiary">@color/classic_tertiary</item>
+        <item name="colorOnTertiary">@color/classic_on_tertiary</item>
 
-        <item name="colorError">@color/blue_error</item>
-        <item name="colorOnError">@color/blue_on_error</item>
+        <!-- Error colors -->
+        <item name="colorError">@color/classic_error</item>
+        <item name="colorOnError">@color/classic_on_error</item>
 
-        <item name="colorSurface">@color/blue_surface</item>
-        <item name="colorOnSurface">@color/blue_on_surface</item>
-        <item name="colorSurfaceVariant">@color/blue_surface_variant</item>
-        <item name="colorOnSurfaceVariant">@color/blue_on_surface_variant</item>
+        <!-- Surface colors -->
+        <item name="colorSurface">@color/classic_surface</item>
+        <item name="colorOnSurface">@color/classic_on_surface</item>
+        <item name="colorSurfaceVariant">@color/classic_surface_variant</item>
+        <item name="colorOnSurfaceVariant">@color/classic_on_surface_variant</item>
 
-        <item name="android:colorBackground">@color/blue_background</item>
-        <item name="colorOnBackground">@color/blue_on_background</item>
+        <!-- Background colors -->
+        <item name="android:colorBackground">@color/classic_background</item>
+        <item name="colorOnBackground">@color/classic_on_background</item>
 
-        <item name="colorOutline">@color/blue_outline</item>
+        <!-- Outline -->
+        <item name="colorOutline">@color/classic_outline</item>
 
-        <item name="android:statusBarColor">@color/blue_background</item>
+        <!-- Status bar -->
+        <item name="android:statusBarColor">@color/classic_background</item>
         <item name="android:windowLightStatusBar">true</item>
 
-        <item name="android:navigationBarColor">@color/blue_background</item>
+        <!-- Navigation bar -->
+        <item name="android:navigationBarColor">@color/classic_background</item>
+        <item name="android:windowLightNavigationBar">true</item>
+    </style>
+    <style name="Theme.MusicReader.Light" parent="Theme.Material3.Light.NoActionBar">
+        <!-- Primary colors -->
+        <item name="colorPrimary">@color/classic_primary</item>
+        <item name="colorOnPrimary">@color/classic_on_primary</item>
+        <item name="colorPrimaryContainer">@color/classic_tertiary</item>
+        <item name="colorOnPrimaryContainer">@color/classic_on_tertiary</item>
+
+        <!-- Secondary colors -->
+        <item name="colorSecondary">@color/classic_secondary</item>
+        <item name="colorOnSecondary">@color/classic_on_secondary</item>
+        <item name="colorSecondaryContainer">@color/classic_surface_variant</item>
+        <item name="colorOnSecondaryContainer">@color/classic_on_surface_variant</item>
+
+        <!-- Tertiary colors -->
+        <item name="colorTertiary">@color/classic_tertiary</item>
+        <item name="colorOnTertiary">@color/classic_on_tertiary</item>
+
+        <!-- Error colors -->
+        <item name="colorError">@color/classic_error</item>
+        <item name="colorOnError">@color/classic_on_error</item>
+
+        <!-- Surface colors -->
+        <item name="colorSurface">@color/classic_surface</item>
+        <item name="colorOnSurface">@color/classic_on_surface</item>
+        <item name="colorSurfaceVariant">@color/classic_surface_variant</item>
+        <item name="colorOnSurfaceVariant">@color/classic_on_surface_variant</item>
+
+        <!-- Background colors -->
+        <item name="android:colorBackground">@color/classic_background</item>
+        <item name="colorOnBackground">@color/classic_on_background</item>
+
+        <!-- Outline -->
+        <item name="colorOutline">@color/classic_outline</item>
+
+        <!-- Status bar -->
+        <item name="android:statusBarColor">@color/classic_background</item>
+        <item name="android:windowLightStatusBar">true</item>
+
+        <!-- Navigation bar -->
+        <item name="android:navigationBarColor">@color/classic_background</item>
         <item name="android:windowLightNavigationBar">true</item>
     </style>
 
